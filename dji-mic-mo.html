@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>dji-mic-mo</title>
+</head>
+<body>
+
+<button id="connectBtn">Connect Device</button>
+<label>
+  <input type="checkbox" id="debug"> Debug logging
+</label>
+
+<div>
+  <label>Audio Channel</label>
+  <select id="audioChannel">
+    <option value="mono">Mono</option>
+    <option value="stereo">Stereo</option>
+    <option value="safetyTrack">Safety Track</option>
+  </select>
+</div>
+<div>
+  <label>Gain (dB)</label>
+  <select id="gain">
+    <option value="-12">-12</option>
+    <option value="-6">-6</option>
+    <option value="0" selected>0</option>
+    <option value="6">6</option>
+    <option value="12">12</option>
+  </select>
+</div>
+<div>
+  <label>Monitor Gain (dB)</label>
+  <select id="monitorGain">
+    <option value="-12">-12</option>
+    <option value="-11">-11</option>
+    <option value="-10">-10</option>
+    <option value="-9">-9</option>
+    <option value="-8">-8</option>
+    <option value="-7">-7</option>
+    <option value="-6">-6</option>
+    <option value="-5">-5</option>
+    <option value="-4">-4</option>
+    <option value="-3">-3</option>
+    <option value="-2">-2</option>
+    <option value="-1">-1</option>
+    <option value="0" selected>0</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+    <option value="6">6</option>
+    <option value="7">7</option>
+    <option value="8">8</option>
+    <option value="9">9</option>
+    <option value="10">10</option>
+    <option value="11">11</option>
+    <option value="12">12</option>
+  </select>
+</div>
+<div><label><input type="checkbox" id="clippingControl"> Clipping Control</label></div>
+<div><label><input type="checkbox" id="autoOffRx"> Auto Off (RX)</label></div>
+<div><label><input type="checkbox" id="receiverOnOffWithCamera"> Receiver On/Off With Camera</label></div>
+<div><label><input type="checkbox" id="strongNoiseCancellation"> Strong Noise Cancellation</label></div>
+<div><label><input type="checkbox" id="powerButtonForNoiseCancellation"> Power Button for Noise Cancellation</label></div>
+<div><label><input type="checkbox" id="lowCut"> Low Cut</label></div>
+<div><label><input type="checkbox" id="autoOffTx"> Auto Off (TX)</label></div>
+<div><label><input type="checkbox" id="micLedOff"> Mic LED Off</label></div>
+<div><label><input type="checkbox" id="plugFreeExternalSpeaker"> Plug-Free External Speaker (Restart required)</label></div>
+
+<pre id="statusOutput"></pre>
+
+<script>
+const USB_VENDOR_ID = 0x2CA3;
+const USB_PRODUCT_ID = 0x4011;
+const USB_ENDPOINT = 6;
+const USB_INTERFACE_NUMBER = 6;
+
+const DUML_SOF = 0x55;
+const DUML_VERSION = 1;
+const DUML_MIN_LENGTH = 13;
+const DUML_MAX_LENGTH = 0x3FF;
+
+function generateCrcTable(poly) {
+  const table = [];
+  for (let i = 0; i < 256; i++) {
+    let crc = i;
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 1) ? (crc >> 1) ^ poly : crc >> 1;
+    }
+    table.push(crc);
+  }
+  return table;
+}
+
+const CRC8_TABLE = generateCrcTable(0x8C);
+const CRC16_TABLE = generateCrcTable(0x8408);
+
+function calculateCrc8(data) {
+  let crc = 0x77;
+  for (const byte of data) {
+    crc = CRC8_TABLE[crc ^ byte];
+  }
+  return crc;
+}
+
+function calculateCrc16(data) {
+  let crc = 0x3692;
+  for (const byte of data) {
+    crc = (crc >> 8) ^ CRC16_TABLE[(crc ^ byte) & 0xFF];
+  }
+  return crc;
+}
+
+function parseAsciiString(data) {
+  return new TextDecoder().decode(data).replace(/\x00+$/, '');
+}
+
+function parseFirmwareVersion(data, reverse = false) {
+  const sequenceData = reverse ? Array.from(data).reverse() : Array.from(data);
+  return sequenceData.map(byte => byte.toString().padStart(2, '0')).join('.');
+}
+
+class RxStatus {
+  firmwareVersion = null;
+  serialNumber = null;
+  macSuffix = null;
+  modelName = null;
+  batteryLevel = null;
+  charging = null;
+  gain = null;
+  monitorGain = null;
+  stereo = null;
+  safetyTrack = null;
+  clippingControl = null;
+  autoOff = null;
+  receiverOnOffWithCamera = null;
+  plugFreeExternalSpeaker = null;
+
+  _metadata = [
+    {prop: "firmwareVersion", name: "Firmware Version"},
+    {prop: "serialNumber", name: "Serial Number"},
+    {prop: "macSuffix", name: "MAC Suffix"},
+    {prop: "modelName", name: "Model Name"},
+    {prop: "batteryLevel", name: "Battery Level (1:Full, 7:Empty)"},
+    {prop: "charging", name: "Charging"},
+    {prop: "gain", name: "Gain (dB)"},
+    {prop: "monitorGain", name: "Monitor Gain (dB)"},
+    {prop: "stereo", name: "Stereo"},
+    {prop: "safetyTrack", name: "Safety Track"},
+    {prop: "clippingControl", name: "Clipping Control"},
+    {prop: "autoOff", name: "Auto Off"},
+    {prop: "receiverOnOffWithCamera", name: "Receiver On/Off With Camera"},
+    {prop: "plugFreeExternalSpeaker", name: "Plug-Free External Speaker"}
+  ];
+
+  toString() {
+    return this._metadata
+      .filter(f => this[f.prop] !== null)
+      .map(f => {
+        const val = this[f.prop];
+        return `  ${f.name}: ${val}`;
+      })
+      .join("\n");
+  }
+}
+
+class TxStatus {
+  txId = null;
+  firmwareVersion = null;
+  serialNumber = null;
+  macSuffix = null;
+  modelName = null;
+  batteryLevel = null;
+  charging = null;
+  inputLevel = null;
+  noiseCancellation = null;
+  strongNoiseCancellation = null;
+  powerButtonForNoiseCancellation = null;
+  lowCut = null;
+  autoOff = null;
+  micLedOff = null;
+
+  _metadata = [
+    {prop: "txId", name: "TX ID"},
+    {prop: "firmwareVersion", name: "Firmware Version"},
+    {prop: "serialNumber", name: "Serial Number"},
+    {prop: "macSuffix", name: "MAC Suffix"},
+    {prop: "modelName", name: "Model Name"},
+    {prop: "batteryLevel", name: "Battery Level (1:Full, 7:Empty)"},
+    {prop: "charging", name: "Charging"},
+    {prop: "inputLevel", name: "Input Level"},
+    {prop: "noiseCancellation", name: "Noise Cancellation"},
+    {prop: "strongNoiseCancellation", name: "Strong Noise Cancellation"},
+    {prop: "powerButtonForNoiseCancellation", name: "Power Button for Noise Cancellation"},
+    {prop: "lowCut", name: "Low Cut"},
+    {prop: "autoOff", name: "Auto Off"},
+    {prop: "micLedOff", name: "Mic LED Off"}
+  ];
+
+  toString() {
+    return this._metadata
+      .filter(f => this[f.prop] !== null && f.prop !== "txId")
+      .map(f => {
+        const val = this[f.prop];
+        return `  ${f.name}: ${val}`;
+      })
+      .join("\n");
+  }
+}
+
+class SystemStatus {
+  rx = new RxStatus();
+  tx = [new TxStatus(), new TxStatus()];
+
+  toString() {
+    const blocks = [`[RX]\n${this.rx.toString()}`];
+    for (const tx of this.tx) {
+      if (tx.txId !== null) {
+        blocks.push(`[TX${tx.txId}]\n${tx.toString()}`);
+      }
+    }
+    return blocks.join("\n");
+  }
+}
+
+class DumlPacket {
+  constructor(version, length, sender, receiver, sequence, cmdType, cmdSet, cmdId, payload = new Uint8Array()) {
+    this.version = version;
+    this.length = length || (DUML_MIN_LENGTH + payload.length);
+    this.sender = sender;
+    this.receiver = receiver;
+    this.sequence = sequence;
+    this.cmdType = cmdType;
+    this.cmdSet = cmdSet;
+    this.cmdId = cmdId;
+    this.payload = payload;
+  }
+
+  toBytes() {
+    if (this.length > DUML_MAX_LENGTH) {
+      return new Uint8Array();
+    }
+
+    const lengthAndVersion = (this.length & 0x3FF) | ((this.version & 0x3F) << 10);
+    const header = [DUML_SOF, lengthAndVersion & 0xFF, (lengthAndVersion >> 8) & 0xFF];
+    header.push(calculateCrc8(header));
+
+    const body = [
+      this.sender, this.receiver,
+      this.sequence & 0xFF, (this.sequence >> 8) & 0xFF,
+      this.cmdType, this.cmdSet, this.cmdId
+    ];
+
+    const packet = [...header, ...body, ...this.payload];
+    const crc = calculateCrc16(packet);
+    packet.push(crc & 0xFF, (crc >> 8) & 0xFF);
+
+    return new Uint8Array(packet);
+  }
+}
+
+class DumlParser {
+  buffer = new Uint8Array();
+
+  appendBuffer(data) {
+    const newBuffer = new Uint8Array(this.buffer.length + data.length);
+    newBuffer.set(this.buffer);
+    newBuffer.set(data, this.buffer.length);
+    this.buffer = newBuffer;
+  }
+
+  extractPackets() {
+    const packets = [];
+    let offset = 0;
+    const totalBytes = this.buffer.length;
+    const mainView = new DataView(this.buffer.buffer, this.buffer.byteOffset, this.buffer.byteLength);
+
+    while (offset < totalBytes) {
+      if (mainView.getUint8(offset) !== DUML_SOF) {
+        offset += 1;
+        continue;
+      }
+
+      if (offset + 4 > totalBytes) {
+        break;
+      }
+
+      const lengthAndVersion = mainView.getUint16(offset + 1, true);
+      const packetLength = lengthAndVersion & 0x3FF;
+      const packetVersion = (lengthAndVersion >> 10) & 0x3F;
+
+      if (packetLength < DUML_MIN_LENGTH) {
+        offset += 1;
+        continue;
+      }
+
+      if (offset + packetLength > totalBytes) {
+        break;
+      }
+
+      const header = this.buffer.subarray(offset, offset + 3);
+      if (calculateCrc8(header) !== mainView.getUint8(offset + 3)) {
+        offset += 1;
+        continue;
+      }
+
+      const packetData = this.buffer.subarray(offset, offset + packetLength);
+      const packetView = new DataView(packetData.buffer, packetData.byteOffset, packetData.byteLength);
+
+      const expectedCrc = packetView.getUint16(packetLength - 2, true);
+
+      if (calculateCrc16(packetData.subarray(0, packetLength - 2)) !== expectedCrc) {
+        offset += 1;
+        continue;
+      }
+
+      packets.push(new DumlPacket(
+        packetVersion,
+        packetLength,
+        packetView.getUint8(4),
+        packetView.getUint8(5),
+        packetView.getUint16(6, true),
+        packetView.getUint8(8),
+        packetView.getUint8(9),
+        packetView.getUint8(10),
+        packetData.subarray(11, packetLength - 2)
+      ));
+      offset += packetLength;
+    }
+
+    this.buffer = this.buffer.subarray(offset);
+    return packets;
+  }
+}
+
+class AbstractDjiDevice {
+  constructor(usbDevice, onPacketSent = null) {
+    this.usbDevice = usbDevice;
+    this.onPacketSent = onPacketSent;
+    this.sequenceNumber = 0x1234;
+  }
+
+  async applyConfiguration(configuration) {}
+  parseStatusPayload(payload, systemStatus) {}
+
+  async setParameter(header, cmdId, value) {
+    const payload = new Uint8Array([...header, cmdId, 0x00, 0x01, value]);
+
+    const packet = new DumlPacket(
+      DUML_VERSION,
+      0,
+      0x02,
+      0x5A,
+      this.sequenceNumber,
+      0x40,
+      0x5B,
+      0x01,
+      payload
+    );
+
+    this.sequenceNumber = (this.sequenceNumber + 1) & 0xFFFF;
+
+    this.onPacketSent?.(packet);
+
+    const packetBytes = packet.toBytes();
+
+    if (packetBytes.length > 0) {
+      try {
+        await this.usbDevice.transferOut(USB_ENDPOINT, packetBytes);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+}
+
+class MobileRxDevice extends AbstractDjiDevice {
+  async applyConfiguration(configuration) {
+    const header1 = [0x02, 0x00, 0x00, 0x00, 0x00];
+    const header2 = [0x02, 0xff, 0xff, 0x00, 0x00];
+
+    for (const [key, value] of Object.entries(configuration)) {
+      switch (key) {
+        case "audioChannel":
+          await this.setParameter(header1, 0x21, value === "safetyTrack" ? 0x01 : 0x00);
+          await this.setParameter(header1, 0x08, value === "stereo" ? 0x02 : 0x00);
+          break;
+        case "clippingControl":
+          await this.setParameter(header1, 0x1e, value ? 0x01 : 0x00);
+          break;
+        case "plugFreeExternalSpeaker":
+          await this.setParameter(header1, 0x23, value ? 0x01 : 0x00);
+          break;
+        case "monitorGain":
+          await this.setParameter(header1, 0x26, value & 0xFF);
+          break;
+        case "gain":
+          await this.setParameter(header1, 0x39, value & 0xFF);
+          break;
+        case "lowCut":
+          await this.setParameter(header2, 0x03, value ? 0x01 : 0x00);
+          break;
+        case "micLedOff":
+          await this.setParameter(header2, 0x0a, value ? 0x02 : 0x00);
+          break;
+        case "autoOffTx":
+          await this.setParameter(header2, 0x10, value ? 0x01 : 0x00);
+          break;
+      }
+    }
+  }
+
+  parseStatusPayload(payload, systemStatus) {
+    const payloadLength = payload.length;
+    if (payloadLength < 4 || payload[1] + 3 !== payloadLength) {
+      return;
+    }
+
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+
+    switch (view.getUint8(3)) {
+      case 0x01:
+        if (payloadLength >= 0x3B) {
+          systemStatus.tx[0].txId = null;
+          systemStatus.tx[1].txId = null;
+          const rx = systemStatus.rx;
+
+          if (view.getUint8(8) === 0x12) {
+            rx.firmwareVersion = parseFirmwareVersion(payload.subarray(9, 13), true);
+            rx.serialNumber = parseAsciiString(payload.subarray(13, 27));
+          }
+          if (view.getUint8(32) === 0x06) {
+            rx.macSuffix = parseAsciiString(payload.subarray(33, 39));
+          }
+          if (view.getUint8(44) === 0x0e) {
+            rx.modelName = parseAsciiString(payload.subarray(45, 59));
+          }
+
+          for (let offset = 59; offset < payloadLength - 53; offset += 54) {
+            const b1 = view.getUint8(offset + 1);
+            if (view.getUint8(offset) === 0x01 && (b1 === 1 || b1 === 2)) {
+              const tx = systemStatus.tx[b1 - 1];
+              tx.txId = b1;
+
+              if (view.getUint8(offset + 5) === 0x12) {
+                tx.firmwareVersion = parseFirmwareVersion(payload.subarray(offset + 6, offset + 10), true);
+                tx.serialNumber = parseAsciiString(payload.subarray(offset + 10, offset + 24));
+              }
+              if (view.getUint8(offset + 29) === 0x06) {
+                tx.macSuffix = parseAsciiString(payload.subarray(offset + 30, offset + 36));
+              }
+              if (view.getUint8(offset + 41) === 0x0c) {
+                tx.modelName = parseAsciiString(payload.subarray(offset + 42, offset + 54));
+              }
+            }
+          }
+        }
+        break;
+      case 0x03:
+        if (payloadLength >= 0x29) {
+          systemStatus.tx[0].txId = null;
+          systemStatus.tx[1].txId = null;
+          const rx = systemStatus.rx;
+
+          const flags10 = view.getUint8(10);
+          const flags37 = view.getUint8(37);
+
+          rx.stereo = Boolean(flags10 & 0x04);
+          rx.gain = view.getInt8(11);
+          rx.monitorGain = view.getInt8(16);
+          rx.safetyTrack = Boolean(flags37 & 0x40);
+          rx.clippingControl = Boolean(flags37 & 0x10);
+          rx.plugFreeExternalSpeaker = Boolean(flags37 & 0x02);
+
+          for (let offset = 41; offset < payloadLength - 31; offset += 32) {
+            const b1 = view.getUint8(offset + 1);
+            if (view.getUint8(offset) === 0x02 && (b1 === 1 || b1 === 2)) {
+              const tx = systemStatus.tx[b1 - 1];
+              tx.txId = b1;
+
+              const flags6 = view.getUint8(offset + 6);
+              const flags7 = view.getUint8(offset + 7);
+              const flags9 = view.getUint8(offset + 9);
+
+              tx.strongNoiseCancellation = Boolean(flags6 & 0x20);
+              tx.autoOff = Boolean(flags6 & 0x10);
+              tx.micLedOff = Boolean(flags6 & 0x02);
+              tx.batteryLevel = (flags7 >> 2) & 0x07;
+              tx.charging = Boolean(flags7 & 0x02);
+              tx.noiseCancellation = Boolean(flags7 & 0x01);
+              tx.lowCut = Boolean(flags9 & 0x20);
+            }
+          }
+        }
+        break;
+      case 0x05:
+        if (payloadLength >= 0x0A) {
+          for (let offset = 3; offset < payloadLength - 6; offset += 7) {
+            const b1 = view.getUint8(offset + 1);
+            if (view.getUint8(offset) === 0x05 && (b1 === 1 || b1 === 2)) {
+              const tx = systemStatus.tx[b1 - 1];
+              tx.txId = b1;
+              tx.inputLevel = view.getUint8(offset + 6);
+            }
+          }
+        }
+        break;
+    }
+  }
+}
+
+class MiniRxDevice extends AbstractDjiDevice {
+  async applyConfiguration(configuration) {
+    const header1 = [0x00, 0x00];
+    const header2 = [0x00, 0x03];
+
+    for (const [key, value] of Object.entries(configuration)) {
+      switch (key) {
+        case "audioChannel":
+          await this.setParameter(header1, 0x21, value === "safetyTrack" ? 0x01 : 0x00);
+          await this.setParameter(header1, 0x08, value === "stereo" ? 0x02 : 0x00);
+          break;
+        case "autoOffRx":
+          await this.setParameter(header1, 0x10, value ? 0x01 : 0x00);
+          break;
+        case "clippingControl":
+          await this.setParameter(header1, 0x1e, value ? 0x01 : 0x00);
+          break;
+        case "receiverOnOffWithCamera":
+          await this.setParameter(header1, 0x20, value ? 0x01 : 0x00);
+          break;
+        case "plugFreeExternalSpeaker":
+          await this.setParameter(header1, 0x23, value ? 0x01 : 0x00);
+          break;
+        case "lowCut":
+          await this.setParameter(header2, 0x03, value ? 0x01 : 0x00);
+          break;
+        case "micLedOff":
+          await this.setParameter(header2, 0x0a, value ? 0x02 : 0x00);
+          break;
+        case "powerButtonForNoiseCancellation":
+          await this.setParameter(header2, 0x0f, value ? 0x01 : 0x00);
+          break;
+        case "autoOffTx":
+          await this.setParameter(header2, 0x10, value ? 0x01 : 0x00);
+          break;
+        case "strongNoiseCancellation":
+          await this.setParameter(header2, 0x1d, value ? 0x01 : 0x00);
+          break;
+      }
+    }
+  }
+
+  parseStatusPayload(payload, systemStatus) {
+    const payloadLength = payload.length;
+    if (payloadLength < 2 || payload[1] !== payloadLength) {
+      return;
+    }
+
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    let txCount = 0;
+    let offset = 3;
+
+    while (offset < payloadLength) {
+      if (txCount < 2) {
+        if (offset + 9 <= payloadLength && view.getUint16(offset + 1, false) === 0x4000) {
+          systemStatus.tx[txCount].txId = null;
+          txCount += 1;
+          offset += 9;
+          continue;
+        }
+
+        if (offset + 23 <= payloadLength && view.getUint8(offset + 8) === 0x0e) {
+          const tx = systemStatus.tx[txCount];
+          tx.txId = txCount + 1;
+
+          tx.firmwareVersion = parseFirmwareVersion(payload.subarray(offset + 4, offset + 8));
+          tx.serialNumber = parseAsciiString(payload.subarray(offset + 9, offset + 23));
+
+          const flags0 = view.getUint8(offset);
+          const flags1 = view.getUint8(offset + 1);
+          const flags3 = view.getUint8(offset + 3);
+
+          tx.powerButtonForNoiseCancellation = Boolean(flags0 & 0x80);
+          tx.strongNoiseCancellation = Boolean(flags0 & 0x20);
+          tx.autoOff = Boolean(flags0 & 0x10);
+          tx.lowCut = Boolean(flags0 & 0x04);
+          tx.batteryLevel = (flags1 >> 2) & 0x07;
+          tx.charging = Boolean(flags1 & 0x02);
+          tx.noiseCancellation = Boolean(flags1 & 0x01);
+          tx.inputLevel = view.getUint8(offset + 2);
+          tx.micLedOff = Boolean(flags3 & 0x80);
+
+          txCount += 1;
+          offset += 23;
+          continue;
+        }
+      }
+
+      if (offset + 22 <= payloadLength && view.getUint8(offset + 6) === 0x0e) {
+        const rx = systemStatus.rx;
+
+        rx.firmwareVersion = parseFirmwareVersion(payload.subarray(offset + 2, offset + 6));
+        rx.serialNumber = parseAsciiString(payload.subarray(offset + 7, offset + 21));
+
+        const flags0 = view.getUint8(offset);
+        const flags1 = view.getUint8(offset + 1);
+        const flags21 = view.getUint8(offset + 21);
+
+        rx.batteryLevel = (flags0 >> 5) & 0x07;
+        rx.charging = Boolean(flags0 & 0x10);
+        rx.stereo = Boolean(flags0 & 0x08);
+        rx.autoOff = Boolean(flags0 & 0x02);
+        rx.receiverOnOffWithCamera = Boolean(flags0 & 0x01);
+        rx.safetyTrack = Boolean(flags1 & 0x80);
+        rx.clippingControl = Boolean(flags1 & 0x20);
+        rx.plugFreeExternalSpeaker = Boolean(flags21 & 0x01);
+        break;
+      }
+
+      break;
+    }
+  }
+}
+
+class DjiMicManager {
+  constructor(usbDevice, onPacketReceived = null, onStatusUpdate = null) {
+    this.usbDevice = usbDevice;
+    this.onPacketReceived = onPacketReceived;
+    this.onStatusUpdate = onStatusUpdate;
+
+    const productName = usbDevice.productName;
+
+    if (productName === "Wireless Mic Rx") {
+      this.activeDevice = new MobileRxDevice(usbDevice, this.onPacketReceived);
+    } else if (productName === "DJI MIC MINI") {
+      this.activeDevice = new MiniRxDevice(usbDevice, this.onPacketReceived);
+    } else {
+      throw new Error(`Unsupported product: ${productName}`);
+    }
+
+    this.systemStatus = new SystemStatus();
+    this.dumlParser = new DumlParser();
+  }
+
+  async startMonitoring(configuration) {
+    await this.usbDevice.claimInterface(USB_INTERFACE_NUMBER);
+    await this.applyOrderedConfiguration(configuration);
+
+    if ("plugFreeExternalSpeaker" in configuration) {
+      return;
+    }
+
+    try {
+      while (this.usbDevice?.opened) {
+        await this._pollUsbDevice();
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async applyOrderedConfiguration(configuration) {
+    const { plugFreeExternalSpeaker, ...orderedConfiguration } = configuration;
+
+    if (plugFreeExternalSpeaker !== undefined) {
+      orderedConfiguration.plugFreeExternalSpeaker = plugFreeExternalSpeaker;
+    }
+
+    await this.activeDevice.applyConfiguration(orderedConfiguration);
+  }
+
+  async _pollUsbDevice() {
+    const receivedChunk = await this.usbDevice.transferIn(USB_ENDPOINT, 1024);
+    this.dumlParser.appendBuffer(new Uint8Array(receivedChunk.data.buffer));
+
+    for (const packet of this.dumlParser.extractPackets()) {
+      this.onPacketReceived?.(packet);
+
+      if (packet.cmdSet === 0x5B && packet.cmdId === 0x03) {
+        this.activeDevice.parseStatusPayload(packet.payload, this.systemStatus);
+        this.onStatusUpdate?.(this.systemStatus);
+      }
+    }
+  }
+}
+
+function formatPacketDump(packet) {
+  const payloadLength = packet.payload.length;
+  const lines = [
+    `Ver: ${packet.version} Len: ${packet.length}(${payloadLength}) ` +
+    `Src: ${packet.sender.toString(16).padStart(2, '0')} Dst: ${packet.receiver.toString(16).padStart(2, '0')} ` +
+    `Seq: ${packet.sequence.toString(16).padStart(4, '0')} Type: ${packet.cmdType.toString(16).padStart(2, '0')} ` +
+    `Set: ${packet.cmdSet.toString(16).padStart(2, '0')} ID: ${packet.cmdId.toString(16).padStart(2, '0')}`
+  ];
+
+  for (let i = 0; i < packet.payload.length; i += 16) {
+    const chunk = packet.payload.subarray(i, i + 16);
+    const hexBytes = Array.from(chunk).map(b => b.toString(16).padStart(2, '0'));
+    const hexPart = hexBytes.length > 8
+      ? hexBytes.slice(0, 8).join(" ") + "  " + hexBytes.slice(8).join(" ")
+      : hexBytes.join(" ");
+    const asciiPart = Array.from(chunk)
+      .map(b => (32 <= b && b <= 126) ? String.fromCharCode(b) : ".")
+      .join("");
+
+    lines.push(`${i.toString(16).padStart(4, '0')}  ${hexPart.padEnd(48, ' ')}  |${asciiPart}|`);
+  }
+  return lines.join("\n");
+}
+
+class ConsolePacketLogger {
+  constructor() {
+    this.debugCheckbox = document.getElementById('debug');
+  }
+
+  logPacket(packet) {
+    if (this.debugCheckbox?.checked) {
+      console.log(`${formatPacketDump(packet)}\n\n`);
+    }
+  }
+}
+
+function displaySystemStatus(status) {
+  document.getElementById('statusOutput').textContent = status.toString();
+}
+
+function getInputValue(el) {
+  if (el.type === 'checkbox') {
+    return el.checked;
+  }
+  if (el.tagName === 'SELECT' && el.id.toLowerCase().includes('gain')) {
+    return parseInt(el.value, 10);
+  }
+  return el.value;
+}
+
+function parseUiArguments() {
+  const elements = Array.from(document.querySelectorAll('select, input[type="checkbox"]:not(#debug)'));
+  return Object.fromEntries(elements.map(el => [el.id, getInputValue(el)]));
+}
+
+async function getTargetUsbDevice() {
+  try {
+    return await navigator.usb.requestDevice({ filters: [{ vendorId: USB_VENDOR_ID, productId: USB_PRODUCT_ID }] });
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+let currentManager = null;
+
+async function main() {
+  document.getElementById('connectBtn').addEventListener('click', async () => {
+    const targetUsbDevice = await getTargetUsbDevice();
+
+    if (targetUsbDevice === null) {
+      return;
+    }
+
+    if (currentManager) {
+      if (currentManager.usbDevice?.opened) {
+        try {
+          await currentManager.usbDevice.close();
+        } catch (error) {
+          console.error(error);
+        }
+      }
+      currentManager = null;
+      document.getElementById('statusOutput').textContent = "";
+    }
+
+    try {
+      await targetUsbDevice.open();
+      if (targetUsbDevice.configuration === null) {
+        await targetUsbDevice.selectConfiguration(1);
+      }
+
+      const logger = new ConsolePacketLogger();
+
+      currentManager = new DjiMicManager(
+        targetUsbDevice,
+        (packet) => logger.logPacket(packet),
+        displaySystemStatus
+      );
+
+      const { plugFreeExternalSpeaker, ...initialConfiguration } = parseUiArguments();
+      currentManager.startMonitoring(initialConfiguration);
+
+    } catch (error) {
+      console.error(error);
+      if (targetUsbDevice?.opened) {
+        try {
+          await targetUsbDevice.close();
+        } catch (closeError) {
+          console.error(closeError);
+        }
+      }
+      currentManager = null;
+      document.getElementById('statusOutput').textContent = "";
+    }
+  });
+
+  const elements = document.querySelectorAll('select, input[type="checkbox"]:not(#debug)');
+
+  for (const el of elements) {
+    el.addEventListener('change', () => {
+      if (currentManager) {
+        currentManager.activeDevice.applyConfiguration({ [el.id]: getInputValue(el) });
+      }
+    });
+  }
+
+  navigator.usb.addEventListener('disconnect', async (event) => {
+    if (currentManager?.usbDevice === event.device) {
+      if (currentManager.usbDevice.opened) {
+        try {
+          await currentManager.usbDevice.close();
+        } catch (error) {
+          console.error(error);
+        }
+      }
+      currentManager = null;
+      document.getElementById('statusOutput').textContent = "";
+    }
+  });
+}
+
+main();
+</script>
+</body>
+</html>
