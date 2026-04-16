@@ -1,0 +1,1109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dji-mic-mo</title>
+<style>
+:root {
+  color-scheme: light dark;
+}
+
+fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.5rem;
+  fieldset {
+    align-items: flex-start;
+  }
+  > div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+button {
+  border: 1px solid ButtonBorder;
+  border-radius: 0.25rem;
+  background-color: Canvas;
+  color: CanvasText;
+  transition: opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+button:hover {
+  opacity: 0.5;
+}
+
+input[type="radio"],
+input[type="range"] {
+  accent-color: LinkText;
+}
+
+button:focus-visible,
+input[type="radio"]:focus-visible,
+input[type="range"]:focus-visible,
+input[type="checkbox"]:focus-visible {
+  outline: 2px solid LinkText;
+  outline-offset: 2px;
+}
+
+input[type="radio"]:hover,
+input[type="range"]:hover {
+  opacity: 0.5;
+}
+
+input[type="checkbox"] {
+  position: relative;
+  flex-shrink: 0;
+  width: 2em;
+  height: 1em;
+  border-radius: 1em;
+  background-color: ButtonBorder;
+  appearance: none;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 0.1em;
+  left: 0.1em;
+  width: 0.8em;
+  height: 0.8em;
+  border-radius: 50%;
+  background-color: Canvas;
+  transition: translate 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+input[type="checkbox"]:checked {
+  background-color: LinkText;
+}
+
+input[type="checkbox"]:checked::before {
+  translate: 1em 0;
+}
+
+input[type="checkbox"]:hover {
+  opacity: 0.5;
+}
+
+label:has(input:disabled),
+div:has(input:disabled) {
+  display: none;
+}
+
+#statusOutput {
+  overflow-x: auto;
+}
+</style>
+</head>
+<body>
+
+<fieldset id="connection">
+  <legend>Connection & Debug</legend>
+  <div>
+    <button id="connectButton">Connect Device</button>
+    <label><input type="checkbox" id="debug"> Debug logging</label>
+  </div>
+</fieldset>
+
+<fieldset id="settings">
+  <legend>Settings</legend>
+
+  <fieldset>
+    <legend>RX</legend>
+    <div>
+      <span>Audio Channel</span>
+      <label><input type="radio" name="audioChannel" value="mono"> Mono</label>
+      <label><input type="radio" name="audioChannel" value="stereo"> Stereo</label>
+      <label><input type="radio" name="audioChannel" value="safetyTrack"> Safety Track</label>
+    </div>
+    <div>
+      <label>Gain (dB) <input type="range" id="gain" min="-12" max="12" step="6" value="0"></label>
+      <output for="gain">0</output>
+    </div>
+    <div>
+      <label>Monitor Gain (dB) <input type="range" id="monitorGain" min="-12" max="12" step="1" value="0"></label>
+      <output for="monitorGain">0</output>
+    </div>
+    <label><input type="checkbox" id="clippingControl"> Clipping Control</label>
+    <label><input type="checkbox" id="autoOffRx"> Auto Off</label>
+    <label><input type="checkbox" id="receiverOnOffWithCamera"> Receiver On/Off With Camera</label>
+    <label><input type="checkbox" id="plugFreeExternalSpeaker"> Plug-Free External Speaker (Restart required)</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>TX</legend>
+    <label><input type="checkbox" id="strongNoiseCancellation"> Strong Noise Cancellation</label>
+    <label><input type="checkbox" id="powerButtonForNoiseCancellation"> Power Button for Noise Cancellation</label>
+    <label><input type="checkbox" id="lowCut"> Low Cut</label>
+    <label><input type="checkbox" id="autoOffTx"> Auto Off</label>
+    <label><input type="checkbox" id="micLedOff"> Mic LED Off</label>
+  </fieldset>
+
+</fieldset>
+
+<fieldset id="status">
+  <legend>Status</legend>
+  <pre id="statusOutput"></pre>
+</fieldset>
+
+<script type="module">
+const USB_VENDOR_ID = 0x2ca3;
+const USB_PRODUCT_ID = 0x4011;
+const USB_ENDPOINT = 6;
+const USB_INTERFACE_NUMBER = 6;
+
+const DUML_SOF = 0x55;
+const DUML_VERSION = 1;
+const DUML_MIN_LENGTH = 13;
+const DUML_MAX_LENGTH = 0x3ff;
+
+const asciiDecoder = new TextDecoder('ascii');
+const gainFormatter = new Intl.NumberFormat(undefined, { signDisplay: 'exceptZero' });
+
+function parseFirmwareVersion(data, reverse = false) {
+  const versionBytes = reverse ? data.toReversed() : data;
+  return Array.from(versionBytes, byte => byte.toString().padStart(2, '0')).join('.');
+}
+
+class RxStatus {
+  firmwareVersion = null;
+  serialNumber = null;
+  macSuffix = null;
+  modelName = null;
+  batteryLevel = null;
+  charging = null;
+  stereo = null;
+  safetyTrack = null;
+  gain = null;
+  monitorGain = null;
+  clippingControl = null;
+  autoOff = null;
+  receiverOnOffWithCamera = null;
+  plugFreeExternalSpeaker = null;
+
+  static #METADATA = {
+    firmwareVersion: 'Firmware Version',
+    serialNumber: 'Serial Number',
+    macSuffix: 'MAC Suffix',
+    modelName: 'Model Name',
+    batteryLevel: 'Battery Level (1:Full, 7:Empty)',
+    charging: 'Charging',
+    stereo: 'Stereo',
+    safetyTrack: 'Safety Track',
+    gain: 'Gain (dB)',
+    monitorGain: 'Monitor Gain (dB)',
+    clippingControl: 'Clipping Control',
+    autoOff: 'Auto Off',
+    receiverOnOffWithCamera: 'Receiver On/Off With Camera',
+    plugFreeExternalSpeaker: 'Plug-Free External Speaker'
+  };
+
+  replace(changes = {}) {
+    const validChanges = {};
+    for (const key of Object.keys(this)) {
+      if (key in changes) {
+        validChanges[key] = changes[key];
+      }
+    }
+    return Object.assign(new RxStatus(), this, validChanges);
+  }
+
+  toString() {
+    return Object.entries(RxStatus.#METADATA)
+      .filter(([key]) => this[key] !== null)
+      .map(([key, label]) => `  ${label}: ${this[key]}`)
+      .join('\n');
+  }
+}
+
+class TxStatus {
+  txId = null;
+  firmwareVersion = null;
+  serialNumber = null;
+  macSuffix = null;
+  modelName = null;
+  batteryLevel = null;
+  charging = null;
+  inputLevel = null;
+  noiseCancellation = null;
+  strongNoiseCancellation = null;
+  powerButtonForNoiseCancellation = null;
+  lowCut = null;
+  autoOff = null;
+  micLedOff = null;
+
+  static #METADATA = {
+    firmwareVersion: 'Firmware Version',
+    serialNumber: 'Serial Number',
+    macSuffix: 'MAC Suffix',
+    modelName: 'Model Name',
+    batteryLevel: 'Battery Level (1:Full, 7:Empty)',
+    charging: 'Charging',
+    inputLevel: 'Input Level',
+    noiseCancellation: 'Noise Cancellation',
+    strongNoiseCancellation: 'Strong Noise Cancellation',
+    powerButtonForNoiseCancellation: 'Power Button for Noise Cancellation',
+    lowCut: 'Low Cut',
+    autoOff: 'Auto Off',
+    micLedOff: 'Mic LED Off'
+  };
+
+  replace(changes = {}) {
+    const validChanges = {};
+    for (const key of Object.keys(this)) {
+      if (key in changes) {
+        validChanges[key] = changes[key];
+      }
+    }
+    return Object.assign(new TxStatus(), this, validChanges);
+  }
+
+  toString() {
+    return Object.entries(TxStatus.#METADATA)
+      .filter(([key]) => this[key] !== null && key !== 'txId')
+      .map(([key, label]) => `  ${label}: ${this[key]}`)
+      .join('\n');
+  }
+}
+
+class SystemStatus {
+  rx = new RxStatus();
+  tx = [new TxStatus(), new TxStatus()];
+
+  replace(changes = {}) {
+    const status = new SystemStatus();
+    status.rx = changes.rx !== undefined ? changes.rx : this.rx.replace();
+    status.tx = changes.tx !== undefined ? changes.tx : this.tx.map(tx => tx.replace());
+    return status;
+  }
+
+  equals(other) {
+    const eq = (a, b) => Object.keys(a).every(key => a[key] === b[key]);
+    return eq(this.rx, other.rx) && eq(this.tx[0], other.tx[0]) && eq(this.tx[1], other.tx[1]);
+  }
+
+  toString() {
+    const txBlocks = this.tx
+      .filter(tx => tx.txId !== null)
+      .map(tx => `[TX${tx.txId}]\n${tx}`);
+    return [`[RX]\n${this.rx}`, ...txBlocks].join('\n');
+  }
+}
+
+class DumlCrc {
+  static #generateTable(poly) {
+    return Array.from({ length: 256 }, (_, crc) => {
+      for (let i = 0; i < 8; i++) {
+        crc = (crc & 1) ? (crc >>> 1) ^ poly : crc >>> 1;
+      }
+      return crc;
+    });
+  }
+
+  static #CRC8_TABLE = new Uint8Array(this.#generateTable(0x8c));
+  static #CRC16_TABLE = new Uint16Array(this.#generateTable(0x8408));
+
+  static calculate8(data) {
+    let crc = 0x77;
+    for (const byte of data) {
+      crc = this.#CRC8_TABLE[crc ^ byte];
+    }
+    return crc;
+  }
+
+  static calculate16(data) {
+    let crc = 0x3692;
+    for (const byte of data) {
+      crc = (crc >>> 8) ^ this.#CRC16_TABLE[(crc ^ byte) & 0xff];
+    }
+    return crc;
+  }
+}
+
+class DumlPacket {
+  constructor(version, length, sender, receiver, sequence, cmdType, cmdSet, cmdId, payload = new Uint8Array()) {
+    this.version = version;
+    this.length = length ?? (DUML_MIN_LENGTH + payload.length);
+    this.sender = sender;
+    this.receiver = receiver;
+    this.sequence = sequence;
+    this.cmdType = cmdType;
+    this.cmdSet = cmdSet;
+    this.cmdId = cmdId;
+    this.payload = payload;
+  }
+
+  static fromBytes(packetBytes) {
+    const view = new DataView(packetBytes.buffer, packetBytes.byteOffset, packetBytes.byteLength);
+    const lengthAndVersion = view.getUint16(1, true);
+    return new DumlPacket(
+      (lengthAndVersion >>> 10) & 0x3f,
+      lengthAndVersion & DUML_MAX_LENGTH,
+      packetBytes[4],
+      packetBytes[5],
+      view.getUint16(6, true),
+      packetBytes[8],
+      packetBytes[9],
+      packetBytes[10],
+      packetBytes.subarray(11, packetBytes.length - 2)
+    );
+  }
+
+  toBytes() {
+    if (this.length > DUML_MAX_LENGTH) {
+      return new Uint8Array();
+    }
+
+    const packet = new Uint8Array(this.length);
+    const view = new DataView(packet.buffer, packet.byteOffset, packet.byteLength);
+    const lengthAndVersion = (this.length & DUML_MAX_LENGTH) | ((this.version & 0x3f) << 10);
+
+    packet[0] = DUML_SOF;
+    view.setUint16(1, lengthAndVersion, true);
+    packet[3] = DumlCrc.calculate8(packet.subarray(0, 3));
+
+    packet[4] = this.sender;
+    packet[5] = this.receiver;
+    view.setUint16(6, this.sequence, true);
+    packet[8] = this.cmdType;
+    packet[9] = this.cmdSet;
+    packet[10] = this.cmdId;
+
+    packet.set(this.payload, 11);
+
+    view.setUint16(this.length - 2, DumlCrc.calculate16(packet.subarray(0, this.length - 2)), true);
+
+    return packet;
+  }
+
+  toString() {
+    const lines = [
+      `Ver: ${this.version} Len: ${this.length}(${this.payload.length}) ` +
+      `Src: ${this.sender.toString(16).padStart(2, '0')} Dst: ${this.receiver.toString(16).padStart(2, '0')} ` +
+      `Seq: ${this.sequence.toString(16).padStart(4, '0')} Type: ${this.cmdType.toString(16).padStart(2, '0')} ` +
+      `Set: ${this.cmdSet.toString(16).padStart(2, '0')} ID: ${this.cmdId.toString(16).padStart(2, '0')}`
+    ];
+
+    for (let i = 0; i < this.payload.length; i += 16) {
+      const chunk = this.payload.subarray(i, i + 16);
+      const hexBytes = Array.from(chunk, byte => byte.toString(16).padStart(2, '0'));
+      const hexPart = hexBytes.length > 8
+        ? hexBytes.slice(0, 8).join(' ') + '  ' + hexBytes.slice(8).join(' ')
+        : hexBytes.join(' ');
+
+      const asciiPart = Array.from(chunk).map(byte => (32 <= byte && byte <= 126) ? String.fromCharCode(byte) : '.').join('');
+      lines.push(`${i.toString(16).padStart(4, '0')}  ${hexPart.padEnd(48, ' ')}  |${asciiPart}|`);
+    }
+
+    return lines.join('\n');
+  }
+}
+
+class DumlParser {
+  #chunks = [];
+  #totalLength = 0;
+
+  appendBuffer(data) {
+    this.#chunks.push(data);
+    this.#totalLength += data.length;
+  }
+
+  extractPackets() {
+    if (this.#chunks.length === 0) {
+      return [];
+    }
+
+    const buffer = new Uint8Array(this.#totalLength);
+    let chunkOffset = 0;
+    for (const chunk of this.#chunks) {
+      buffer.set(chunk, chunkOffset);
+      chunkOffset += chunk.length;
+    }
+
+    const packets = [];
+    let offset = 0;
+    const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+
+    while (offset < this.#totalLength) {
+      const nextSofIndex = buffer.indexOf(DUML_SOF, offset);
+      if (nextSofIndex === -1) {
+        offset = this.#totalLength;
+        break;
+      }
+      offset = nextSofIndex;
+
+      if (offset + 4 > this.#totalLength) {
+        break;
+      }
+
+      const lengthAndVersion = view.getUint16(offset + 1, true);
+      const packetLength = lengthAndVersion & DUML_MAX_LENGTH;
+
+      if (packetLength < DUML_MIN_LENGTH) {
+        offset += 1;
+        continue;
+      }
+
+      if (offset + packetLength > this.#totalLength) {
+        break;
+      }
+
+      const header = buffer.subarray(offset, offset + 3);
+      if (DumlCrc.calculate8(header) !== buffer[offset + 3]) {
+        offset += 1;
+        continue;
+      }
+
+      const expectedCrc = view.getUint16(offset + packetLength - 2, true);
+      if (
+        DumlCrc.calculate16(buffer.subarray(offset, offset + packetLength - 2)) !== expectedCrc
+      ) {
+        offset += 1;
+        continue;
+      }
+
+      packets.push(DumlPacket.fromBytes(buffer.subarray(offset, offset + packetLength)));
+      offset += packetLength;
+    }
+
+    if (offset === this.#totalLength) {
+      this.#chunks = [];
+      this.#totalLength = 0;
+    } else if (offset > 0) {
+      const remaining = buffer.subarray(offset);
+      this.#chunks = [remaining];
+      this.#totalLength = remaining.length;
+    } else {
+      this.#chunks = [buffer];
+    }
+
+    return packets;
+  }
+}
+
+class BaseDjiDevice {
+  #sequenceNumber = 0x1234;
+
+  constructor(usbDevice, onPacketSent = null) {
+    this.usbDevice = usbDevice;
+    this.onPacketSent = onPacketSent;
+  }
+
+  get supportedSettings() {
+    throw new Error("NotImplementedError");
+  }
+
+  async applySettings(settings) {
+    throw new Error("NotImplementedError");
+  }
+
+  updateStatusFromPayload(payload, status) {
+    throw new Error("NotImplementedError");
+  }
+
+  async setParameter(header, cmdId, value, isSigned = false) {
+    const payload = new Uint8Array(header.length + 4);
+    payload.set(header);
+    payload[header.length] = cmdId;
+    payload[header.length + 1] = 0x00;
+    payload[header.length + 2] = 0x01;
+
+    const view = new DataView(payload.buffer);
+    if (isSigned) {
+      view.setInt8(header.length + 3, value);
+    } else {
+      view.setUint8(header.length + 3, value);
+    }
+
+    const packet = new DumlPacket(
+      DUML_VERSION,
+      undefined,
+      0x02,
+      0x5a,
+      this.#sequenceNumber,
+      0x40,
+      0x5b,
+      0x01,
+      payload
+    );
+
+    this.#sequenceNumber = (this.#sequenceNumber + 1) & 0xffff;
+
+    const packetBytes = packet.toBytes();
+
+    if (packetBytes.length > 0) {
+      try {
+        await this.usbDevice.transferOut(USB_ENDPOINT, packetBytes);
+        this.onPacketSent?.(packet);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  }
+}
+
+class MobileRxDevice extends BaseDjiDevice {
+  get supportedSettings() {
+    return [
+      'audioChannel',
+      'gain',
+      'monitorGain',
+      'clippingControl',
+      'plugFreeExternalSpeaker',
+      'lowCut',
+      'autoOffTx',
+      'micLedOff'
+    ];
+  }
+
+  async applySettings(settings) {
+    const rxHeader = [0x02, 0x00, 0x00, 0x00, 0x00];
+    const txHeader = [0x02, 0xff, 0xff, 0x00, 0x00];
+
+    for (const [key, value] of Object.entries(settings)) {
+      switch (key) {
+        case 'audioChannel':
+          await this.setParameter(rxHeader, 0x21, value === 'safetyTrack' ? 0x01 : 0x00);
+          await this.setParameter(rxHeader, 0x08, value === 'stereo' ? 0x02 : 0x00);
+          break;
+        case 'clippingControl':
+          await this.setParameter(rxHeader, 0x1e, value ? 0x01 : 0x00);
+          break;
+        case 'plugFreeExternalSpeaker':
+          await this.setParameter(rxHeader, 0x23, value ? 0x01 : 0x00);
+          break;
+        case 'monitorGain':
+          await this.setParameter(rxHeader, 0x26, value, true);
+          break;
+        case 'gain':
+          await this.setParameter(rxHeader, 0x39, value, true);
+          break;
+        case 'lowCut':
+          await this.setParameter(txHeader, 0x03, value ? 0x01 : 0x00);
+          break;
+        case 'micLedOff':
+          await this.setParameter(txHeader, 0x0a, value ? 0x02 : 0x00);
+          break;
+        case 'autoOffTx':
+          await this.setParameter(txHeader, 0x10, value ? 0x01 : 0x00);
+          break;
+      }
+    }
+  }
+
+  updateStatusFromPayload(payload, status) {
+    const payloadLength = payload.length;
+    if (payloadLength < 4 || payload[1] + 3 !== payloadLength) {
+      return;
+    }
+
+    const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+
+    switch (payload[3]) {
+      case 0x01:
+        if (payloadLength >= 0x3b) {
+          status.tx[0].txId = null;
+          status.tx[1].txId = null;
+          const rx = status.rx;
+
+          if (payload[8] === 0x12) {
+            rx.firmwareVersion = parseFirmwareVersion(payload.subarray(9, 13), true);
+            rx.serialNumber = asciiDecoder.decode(payload.subarray(13, 27));
+          }
+          if (payload[32] === 0x06) {
+            rx.macSuffix = asciiDecoder.decode(payload.subarray(33, 39));
+          }
+          if (payload[44] === 0x0e) {
+            rx.modelName = asciiDecoder.decode(payload.subarray(45, 59));
+          }
+
+          for (let offset = 59; offset < payloadLength - 53; offset += 54) {
+            const txId = payload[offset + 1];
+            if (payload[offset] === 0x01 && (txId === 1 || txId === 2)) {
+              const tx = status.tx[txId - 1];
+              tx.txId = txId;
+
+              if (payload[offset + 5] === 0x12) {
+                tx.firmwareVersion = parseFirmwareVersion(
+                  payload.subarray(offset + 6, offset + 10), true
+                );
+                tx.serialNumber = asciiDecoder.decode(payload.subarray(offset + 10, offset + 24));
+              }
+              if (payload[offset + 29] === 0x06) {
+                tx.macSuffix = asciiDecoder.decode(payload.subarray(offset + 30, offset + 36));
+              }
+              if (payload[offset + 41] === 0x0c) {
+                tx.modelName = asciiDecoder.decode(payload.subarray(offset + 42, offset + 54));
+              }
+            }
+          }
+        }
+        break;
+
+      case 0x03:
+        if (payloadLength >= 0x29) {
+          status.tx[0].txId = null;
+          status.tx[1].txId = null;
+          const rx = status.rx;
+
+          const flags10 = payload[10];
+          const flags37 = payload[37];
+
+          rx.stereo = Boolean(flags10 & 0x04);
+          rx.gain = view.getInt8(11);
+          rx.monitorGain = view.getInt8(16);
+          rx.safetyTrack = Boolean(flags37 & 0x40);
+          rx.clippingControl = Boolean(flags37 & 0x10);
+          rx.plugFreeExternalSpeaker = Boolean(flags37 & 0x02);
+
+          for (let offset = 41; offset < payloadLength - 31; offset += 32) {
+            const txId = payload[offset + 1];
+            if (payload[offset] === 0x02 && (txId === 1 || txId === 2)) {
+              const tx = status.tx[txId - 1];
+              tx.txId = txId;
+
+              const flags6 = payload[offset + 6];
+              const flags7 = payload[offset + 7];
+              const flags9 = payload[offset + 9];
+
+              tx.strongNoiseCancellation = Boolean(flags6 & 0x20);
+              tx.autoOff = Boolean(flags6 & 0x10);
+              tx.micLedOff = Boolean(flags6 & 0x02);
+              tx.batteryLevel = (flags7 >>> 2) & 0x07;
+              tx.charging = Boolean(flags7 & 0x02);
+              tx.noiseCancellation = Boolean(flags7 & 0x01);
+              tx.lowCut = Boolean(flags9 & 0x20);
+            }
+          }
+        }
+        break;
+
+      case 0x05:
+        if (payloadLength >= 0x0a) {
+          for (let offset = 3; offset < payloadLength - 6; offset += 7) {
+            const txId = payload[offset + 1];
+            if (payload[offset] === 0x05 && (txId === 1 || txId === 2)) {
+              const tx = status.tx[txId - 1];
+              tx.txId = txId;
+              tx.inputLevel = payload[offset + 6];
+            }
+          }
+        }
+        break;
+    }
+  }
+}
+
+class MiniRxDevice extends BaseDjiDevice {
+  get supportedSettings() {
+    return [
+      'audioChannel',
+      'clippingControl',
+      'autoOffRx',
+      'receiverOnOffWithCamera',
+      'plugFreeExternalSpeaker',
+      'strongNoiseCancellation',
+      'powerButtonForNoiseCancellation',
+      'lowCut',
+      'autoOffTx',
+      'micLedOff'
+    ];
+  }
+
+  async applySettings(settings) {
+    const rxHeader = [0x00, 0x00];
+    const txHeader = [0x00, 0x03];
+
+    for (const [key, value] of Object.entries(settings)) {
+      switch (key) {
+        case 'audioChannel':
+          await this.setParameter(rxHeader, 0x21, value === 'safetyTrack' ? 0x01 : 0x00);
+          await this.setParameter(rxHeader, 0x08, value === 'stereo' ? 0x02 : 0x00);
+          break;
+        case 'autoOffRx':
+          await this.setParameter(rxHeader, 0x10, value ? 0x01 : 0x00);
+          break;
+        case 'clippingControl':
+          await this.setParameter(rxHeader, 0x1e, value ? 0x01 : 0x00);
+          break;
+        case 'receiverOnOffWithCamera':
+          await this.setParameter(rxHeader, 0x20, value ? 0x01 : 0x00);
+          break;
+        case 'plugFreeExternalSpeaker':
+          await this.setParameter(rxHeader, 0x23, value ? 0x01 : 0x00);
+          break;
+        case 'lowCut':
+          await this.setParameter(txHeader, 0x03, value ? 0x01 : 0x00);
+          break;
+        case 'micLedOff':
+          await this.setParameter(txHeader, 0x0a, value ? 0x02 : 0x00);
+          break;
+        case 'powerButtonForNoiseCancellation':
+          await this.setParameter(txHeader, 0x0f, value ? 0x01 : 0x00);
+          break;
+        case 'autoOffTx':
+          await this.setParameter(txHeader, 0x10, value ? 0x01 : 0x00);
+          break;
+        case 'strongNoiseCancellation':
+          await this.setParameter(txHeader, 0x1d, value ? 0x01 : 0x00);
+          break;
+      }
+    }
+  }
+
+  updateStatusFromPayload(payload, status) {
+    const payloadLength = payload.length;
+    if (payloadLength < 2 || payload[1] !== payloadLength) {
+      return;
+    }
+
+    let offset = 3;
+
+    for (let txCount = 0; txCount < 2; txCount++) {
+      if (offset + 9 <= payloadLength && payload[offset + 1] === 0x40 && payload[offset + 2] === 0x00) {
+        status.tx[txCount].txId = null;
+        offset += 9;
+      } else if (offset + 23 <= payloadLength && payload[offset + 8] === 0x0e) {
+        const tx = status.tx[txCount];
+        tx.txId = txCount + 1;
+
+        tx.firmwareVersion = parseFirmwareVersion(payload.subarray(offset + 4, offset + 8));
+        tx.serialNumber = asciiDecoder.decode(payload.subarray(offset + 9, offset + 23));
+
+        const flags0 = payload[offset];
+        const flags1 = payload[offset + 1];
+        const flags3 = payload[offset + 3];
+
+        tx.powerButtonForNoiseCancellation = Boolean(flags0 & 0x80);
+        tx.strongNoiseCancellation = Boolean(flags0 & 0x20);
+        tx.autoOff = Boolean(flags0 & 0x10);
+        tx.lowCut = Boolean(flags0 & 0x04);
+        tx.batteryLevel = (flags1 >>> 2) & 0x07;
+        tx.charging = Boolean(flags1 & 0x02);
+        tx.noiseCancellation = Boolean(flags1 & 0x01);
+        tx.inputLevel = payload[offset + 2];
+        tx.micLedOff = Boolean(flags3 & 0x80);
+
+        offset += 23;
+      }
+    }
+
+    if (offset + 22 <= payloadLength && payload[offset + 6] === 0x0e) {
+      const rx = status.rx;
+
+      rx.firmwareVersion = parseFirmwareVersion(payload.subarray(offset + 2, offset + 6));
+      rx.serialNumber = asciiDecoder.decode(payload.subarray(offset + 7, offset + 21));
+
+      const flags0 = payload[offset];
+      const flags1 = payload[offset + 1];
+      const flags21 = payload[offset + 21];
+
+      rx.batteryLevel = (flags0 >>> 5) & 0x07;
+      rx.charging = Boolean(flags0 & 0x10);
+      rx.stereo = Boolean(flags0 & 0x08);
+      rx.autoOff = Boolean(flags0 & 0x02);
+      rx.receiverOnOffWithCamera = Boolean(flags0 & 0x01);
+      rx.safetyTrack = Boolean(flags1 & 0x80);
+      rx.clippingControl = Boolean(flags1 & 0x20);
+      rx.plugFreeExternalSpeaker = Boolean(flags21 & 0x01);
+    }
+  }
+}
+
+class DjiMicManager extends EventTarget {
+  constructor(usbDevice) {
+    super();
+    this.usbDevice = usbDevice;
+
+    const onPacketSent = (packet) =>
+      this.dispatchEvent(new CustomEvent('packet-sent', { detail: packet }));
+
+    const productName = usbDevice.productName;
+
+    if (productName === 'Wireless Mic Rx') {
+      this.activeDevice = new MobileRxDevice(usbDevice, onPacketSent);
+    } else if (productName === 'DJI MIC MINI') {
+      this.activeDevice = new MiniRxDevice(usbDevice, onPacketSent);
+    } else {
+      throw new Error(`Unsupported product: ${productName}`);
+    }
+
+    this.status = new SystemStatus();
+    this.dumlParser = new DumlParser();
+  }
+
+  async startMonitoring() {
+    await this.usbDevice.claimInterface(USB_INTERFACE_NUMBER);
+    try {
+      while (this.usbDevice?.opened) {
+        await this.#pollUsbDevice();
+      }
+    } finally {
+      await this.usbDevice.releaseInterface(USB_INTERFACE_NUMBER);
+    }
+  }
+
+  async #pollUsbDevice() {
+    const chunk = await this.usbDevice.transferIn(USB_ENDPOINT, 1024);
+    if (chunk.status !== 'ok') {
+      return;
+    }
+
+    this.dumlParser.appendBuffer(
+      new Uint8Array(chunk.data.buffer, chunk.data.byteOffset, chunk.data.byteLength)
+    );
+
+    for (const packet of this.dumlParser.extractPackets()) {
+      this.dispatchEvent(new CustomEvent('packet-received', { detail: packet }));
+
+      if (packet.cmdSet === 0x5b && packet.cmdId === 0x03) {
+        const newStatus = this.status.replace();
+        this.activeDevice.updateStatusFromPayload(packet.payload, newStatus);
+        if (!this.status.equals(newStatus)) {
+          this.status = newStatus;
+          this.dispatchEvent(new CustomEvent('status-update', { detail: this.status }));
+        }
+      }
+    }
+  }
+}
+
+async function getTargetUsbDevice() {
+  try {
+    return await navigator.usb.requestDevice({
+      filters: [{ vendorId: USB_VENDOR_ID, productId: USB_PRODUCT_ID }]
+    });
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
+}
+
+class ConsolePacketLogger {
+  #debugCheckbox;
+
+  constructor() {
+    this.#debugCheckbox = document.getElementById('debug');
+  }
+
+  logPacket(packet) {
+    if (this.#debugCheckbox.checked) {
+      console.log(`${packet}\n`);
+    }
+  }
+}
+
+class DjiMicUIController {
+  #currentManager = null;
+  #isApplyingSettings = false;
+  #logger = new ConsolePacketLogger();
+  #connectButton = document.getElementById('connectButton');
+  #settingsContainer = document.getElementById('settings');
+  #settingInputs = Array.from(this.#settingsContainer.querySelectorAll('input'));
+  #statusOutput = document.getElementById('statusOutput');
+
+  constructor() {
+    this.#initUI();
+    this.#bindEvents();
+  }
+
+  #initUI() {
+    this.#applySupportedSettings(null);
+    this.#settingInputs
+      .filter(input => input.type === 'range')
+      .forEach(input => this.#updateRangeOutput(input));
+  }
+
+  #bindEvents() {
+    this.#connectButton.addEventListener('click', () => this.#connect());
+
+    this.#settingsContainer.addEventListener('input', ({ target }) => {
+      if (target.type === 'range') {
+        this.#updateRangeOutput(target);
+      }
+    });
+
+    this.#settingsContainer.addEventListener('change', async ({ target }) => {
+      if (
+        target.tagName !== 'INPUT' ||
+        !this.#currentManager ||
+        target.disabled ||
+        this.#isApplyingSettings
+      ) {
+        return;
+      }
+
+      const key = target.name || target.id;
+
+      if (!this.#currentManager.activeDevice.supportedSettings.includes(key)) {
+        return;
+      }
+
+      const value = target.type === 'checkbox' ? target.checked
+                  : target.type === 'range' ? target.valueAsNumber
+                  : target.value;
+
+      if (target.type === 'range' && Number.isNaN(value)) {
+        return;
+      }
+
+      this.#isApplyingSettings = true;
+      try {
+        await this.#currentManager.activeDevice.applySettings({ [key]: value });
+      } catch (error) {
+        console.error(error);
+      } finally {
+        this.#isApplyingSettings = false;
+      }
+    });
+
+    navigator.usb.addEventListener('disconnect', async ({ device }) => {
+      if (this.#currentManager?.usbDevice === device) {
+        await this.#disconnect();
+      }
+    });
+  }
+
+  async #connect() {
+    const targetUsbDevice = await getTargetUsbDevice();
+    if (!targetUsbDevice) {
+      return;
+    }
+
+    if (this.#currentManager) {
+      await this.#disconnect();
+    }
+
+    try {
+      await targetUsbDevice.open();
+      if (targetUsbDevice.configuration === null) {
+        await targetUsbDevice.selectConfiguration(1);
+      }
+
+      this.#currentManager = new DjiMicManager(targetUsbDevice);
+
+      this.#applySupportedSettings(this.#currentManager.activeDevice.supportedSettings);
+
+      this.#currentManager.addEventListener('packet-received', ({ detail }) => {
+        this.#logger.logPacket(detail);
+      });
+
+      this.#currentManager.addEventListener('packet-sent', ({ detail }) => {
+        this.#logger.logPacket(detail);
+      });
+
+      this.#currentManager.addEventListener('status-update', ({ detail }) => {
+        this.#updateInputValues(detail);
+        this.#statusOutput.textContent = detail.toString();
+      });
+
+      await this.#currentManager.startMonitoring();
+      await this.#disconnect();
+
+    } catch (error) {
+      console.error(error);
+      if (targetUsbDevice?.opened) {
+        try {
+          await targetUsbDevice.close();
+        } catch (error) {
+          console.error(error);
+        }
+      }
+      this.#resetUI();
+    }
+  }
+
+  async #disconnect() {
+    if (this.#currentManager?.usbDevice?.opened) {
+      try {
+        await this.#currentManager.usbDevice.close();
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    this.#resetUI();
+  }
+
+  #resetUI() {
+    this.#currentManager = null;
+    this.#applySupportedSettings(null);
+    this.#statusOutput.textContent = '';
+  }
+
+  #applySupportedSettings(supportedSettings) {
+    for (const input of this.#settingInputs) {
+      input.disabled = !supportedSettings?.includes(input.name || input.id);
+    }
+  }
+
+  #updateInputValues(status) {
+    const rx = status.rx;
+    const tx = status.tx.find(tx => tx.txId !== null) ?? {};
+
+    const settingsState = {
+      audioChannel: rx.safetyTrack === null ? null :
+                    rx.safetyTrack ? 'safetyTrack' :
+                    rx.stereo ? 'stereo' : 'mono',
+      gain: rx.gain,
+      monitorGain: rx.monitorGain,
+      clippingControl: rx.clippingControl,
+      autoOffRx: rx.autoOff,
+      receiverOnOffWithCamera: rx.receiverOnOffWithCamera,
+      plugFreeExternalSpeaker: rx.plugFreeExternalSpeaker,
+      strongNoiseCancellation: tx.strongNoiseCancellation,
+      powerButtonForNoiseCancellation: tx.powerButtonForNoiseCancellation,
+      lowCut: tx.lowCut,
+      autoOffTx: tx.autoOff,
+      micLedOff: tx.micLedOff
+    };
+
+    for (const input of this.#settingInputs) {
+      if (input.disabled || (input === document.activeElement && input.type === 'range')) {
+        continue;
+      }
+
+      const value = settingsState[input.name || input.id];
+      if (value == null) {
+        continue;
+      }
+
+      if (input.type === 'radio') {
+        const shouldBeChecked = (input.value === value);
+        if (input.checked !== shouldBeChecked) {
+          input.checked = shouldBeChecked;
+        }
+      } else if (input.type === 'range') {
+        if (input.valueAsNumber !== value) {
+          input.value = value;
+          this.#updateRangeOutput(input);
+        }
+      } else if (input.type === 'checkbox') {
+        if (input.checked !== value) {
+          input.checked = value;
+        }
+      }
+    }
+  }
+
+  #updateRangeOutput(input) {
+    const output = this.#settingsContainer.querySelector(`output[for="${input.id}"]`);
+    if (output) {
+      output.value = gainFormatter.format(input.value);
+    }
+  }
+}
+
+new DjiMicUIController();
+</script>
+</body>
+</html>
