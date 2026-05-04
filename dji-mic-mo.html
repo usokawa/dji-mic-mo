@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dji-mic-mo</title>
+<style>
+:root {
+  color-scheme: light dark;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.5rem;
+  font-family: system-ui, sans-serif;
+  color: CanvasText;
+  background-color: Canvas;
+}
+
+fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.5rem;
+
+  & fieldset {
+    padding: 0.5rem;
+    align-items: flex-start;
+  }
+
+  & > div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+#cfgGrp fieldset > div:has(input:disabled) {
+  display: none;
+}
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+button {
+  padding: 0.25rem 0.5rem;
+  color: CanvasText;
+  background-color: Canvas;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.25rem;
+  transition: opacity 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+:is(button, #cfgTxt):disabled {
+  color: GrayText;
+  background-color: ButtonFace;
+  border-color: GrayText;
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+input[type="range"] {
+  accent-color: LinkText;
+}
+
+input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  flex-shrink: 0;
+  inline-size: 2em;
+  block-size: 1em;
+  background-color: ButtonBorder;
+  border-radius: 1em;
+}
+
+input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  inset-block-start: 0.1em;
+  inset-inline-start: 0.1em;
+  inline-size: 0.8em;
+  block-size: 0.8em;
+  background-color: Canvas;
+  border-radius: 50%;
+  transition: inset-inline-start 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+input[type="checkbox"]:checked {
+  background-color: LinkText;
+}
+
+input[type="checkbox"]:checked::before {
+  inset-inline-start: 1.1em;
+}
+
+:is(button, input[type="range"], input[type="checkbox"]):focus-visible {
+  outline: 2px solid LinkText;
+  outline-offset: 2px;
+}
+
+:is(button:not(:disabled), input[type="range"], input[type="checkbox"]):hover {
+  opacity: 0.5;
+}
+
+:is(#stateTxt, #cfgTxt) {
+  inline-size: 100%;
+  margin: 0;
+  padding: 0.5rem;
+  color: CanvasText;
+  background-color: Canvas;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.25rem;
+  overflow-inline: auto;
+}
+
+#cfgTxt {
+  display: block;
+  field-sizing: content;
+  resize: none;
+}
+
+#cfgTxt:focus-visible {
+  outline: 2px solid LinkText;
+  outline-offset: -1px;
+}
+</style>
+</head>
+<body>
+<fieldset id="connGrp">
+  <legend>Connection</legend>
+  <div>
+    <button id="connBtn" type="button">Connect</button>
+    <div><label><input id="debugChk" type="checkbox"> Debug</label></div>
+  </div>
+</fieldset>
+<fieldset id="cfgGrp">
+  <legend>Config</legend>
+  <fieldset>
+    <legend>RX</legend>
+    <div><label><input name="rx.stereo" type="checkbox"> Stereo</label></div>
+    <div><label><input name="rx.safetyTrack" type="checkbox"> Safety Track</label></div>
+    <div>
+      <label>Gain Control (dB) <input id="rx-gainControl" name="rx.gainControl" type="range" min="-12" max="12" step="6" value="0"></label>
+      <output for="rx-gainControl">0</output>
+    </div>
+    <div>
+      <label>Monitoring Gain (dB) <input id="rx-monitoringGain" name="rx.monitoringGain" type="range" min="-12" max="12" step="1" value="0"></label>
+      <output for="rx-monitoringGain">0</output>
+    </div>
+    <div><label><input name="rx.clippingControl" type="checkbox"> Clipping Control</label></div>
+    <div><label><input name="rx.autoOff" type="checkbox"> Auto Off</label></div>
+    <div><label><input name="rx.receiverOnOffWithCamera" type="checkbox"> Receiver On/Off With Camera</label></div>
+    <div><label><input name="rx.plugFreeExternalSpeaker" type="checkbox"> Plug-Free External Speaker (Restart required)</label></div>
+  </fieldset>
+  <fieldset>
+    <legend>TX</legend>
+    <div><label><input name="tx.noiseCancellation" type="checkbox"> Noise Cancellation</label></div>
+    <div><label><input name="tx.noiseCancellationStrong" type="checkbox"> Noise Cancellation: Strong</label></div>
+    <div><label><input name="tx.noiseCancellationViaButton" type="checkbox"> Noise Cancellation via Button</label></div>
+    <div><label><input name="tx.lowCut" type="checkbox"> Low Cut</label></div>
+    <div><label><input name="tx.autoOff" type="checkbox"> Auto Off</label></div>
+    <div><label><input name="tx.micLedOff" type="checkbox"> Mic LED Off</label></div>
+  </fieldset>
+  <fieldset>
+    <legend>TX1</legend>
+    <div><label><input name="tx1.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
+    <div><label><input name="tx1.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+  </fieldset>
+  <fieldset>
+    <legend>TX2</legend>
+    <div><label><input name="tx2.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
+    <div><label><input name="tx2.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+  </fieldset>
+</fieldset>
+<fieldset id="jsonGrp">
+  <legend>Config (JSON)</legend>
+  <div><button id="applyBtn" type="button">Apply</button></div>
+  <div><textarea id="cfgTxt" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></div>
+</fieldset>
+<fieldset id="stateGrp">
+  <legend>State</legend>
+  <pre id="stateTxt"></pre>
+</fieldset>
+
+<script type="module">
+const strDec = new TextDecoder();
+const numFmt = new Intl.NumberFormat('en-US', { signDisplay: 'exceptZero' });
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+const connBtn = document.getElementById('connBtn');
+const debugChk = document.getElementById('debugChk');
+const cfgGrp = document.getElementById('cfgGrp');
+const cfgInputs = cfgGrp.querySelectorAll('input');
+const applyBtn = document.getElementById('applyBtn');
+const cfgTxt = document.getElementById('cfgTxt');
+const stateTxt = document.getElementById('stateTxt');
+
+let usbDev = null;
+let state = null;
+let seq = 0;
+let debug = false;
+
+const concat = (a, b) => {
+  if (a.length === 0) return b;
+  if (b.length === 0) return a;
+
+  const c = new Uint8Array(a.length + b.length);
+  c.set(a);
+  c.set(b, a.length);
+  return c;
+};
+
+const ver = (buf, off) =>
+  [...buf.subarray(off, off + 4)]
+    .reverse()
+    .map((b) => String(b).padStart(2, '0'))
+    .join('.');
+const fstr = (sz) => (buf, off) => strDec.decode(buf.subarray(off, off + sz));
+const vstr = (buf, off) => strDec.decode(buf.subarray(off, off + buf[off - 1]));
+
+const i8 = (buf, off) => new DataView(buf.buffer, buf.byteOffset).getInt8(off);
+const u8 = (buf, off) => buf[off];
+const bits = (shift, mask) => (buf, off) => (buf[off] >>> shift) & mask;
+const bit = (mask) => (buf, off) => !!(buf[off] & mask);
+
+const bl1 = (val) => typeof val === 'boolean' ? (val ? 1 : 0) : null;
+const bl2 = (val) => typeof val === 'boolean' ? (val ? 2 : 0) : null;
+const gain = (val) => [-12, -6, 0, 6, 12].includes(val) ? val & 0xff : null;
+const mgain = (val) => Number.isInteger(val) && val >= -12 && val <= 12 ? val & 0xff : null;
+
+const ADDR = { rx: 0, tx1: 1 << 0, tx2: 1 << 1, tx: ~0 };
+
+const RULES = {
+  rx: {
+    firmwareVersion:         [0x01,  9, ver],
+    serialNumber:            [0x01, 13, fstr(14)],
+    addressSuffix:           [0x01, 33, fstr(6)],
+    deviceName:              [0x01, 45, vstr],
+    batteryLevel:            [0x03, 10, bits(5, 0x07), 'DJI Mic Mini'],
+    charging:                [0x03, 10, bit(0x10), 'DJI Mic Mini'],
+    stereo:                  [0x03, 10, bit(0x04), 0x08, bl2],
+    safetyTrack:             [0x03, 37, bit(0x40), 0x21, bl1],
+    gainControl:             [0x03, 11, i8,        0x39, gain, '+DJI Mic Mini 2'],
+    monitoringGain:          [0x03, 16, i8,        0x26, mgain, 'DJI Mic Mini 2'],
+    clippingControl:         [0x03, 37, bit(0x10), 0x1e, bl1],
+    autoOff:                 [0x03, 10, bit(0x01), 0x10, bl1, 'DJI Mic Mini'],
+    receiverOnOffWithCamera: [0x03,  9, bit(0x80), 0x20, bl1, 'DJI Mic Mini'],
+    plugFreeExternalSpeaker: [0x03, 37, bit(0x02), 0x23, bl1],
+  },
+  tx: {
+    noiseCancellation:          [0x03,  7, bit(0x01), 0x38, bl1, '+DJI Mic Mini'],
+    noiseCancellationStrong:    [0x03,  6, bit(0x20), 0x37, bl1, '+DJI Mic Mini'],
+    noiseCancellationViaButton: [0x03,  6, bit(0x80), 0x0f, bl1, 'DJI Mic Mini'],
+    lowCut:                     [0x03,  9, bit(0x20), 0x03, bl1],
+    autoOff:                    [0x03,  6, bit(0x10), 0x10, bl1],
+    micLedOff:                  [0x03,  6, bit(0x02), 0x0a, bl2],
+  },
+  txi: {
+    firmwareVersion:         [0x01,  6, ver],
+    serialNumber:            [0x01, 10, fstr(14)],
+    addressSuffix:           [0x01, 30, fstr(6)],
+    deviceName:              [0x01, 42, vstr],
+    voiceToneRich:           [0x03,  9, bit(0x40), 0x29, bl1, 'DJI Mic Mini 2'],
+    voiceToneBright:         [0x03,  9, bit(0x80), 0x29, bl2, 'DJI Mic Mini 2'],
+    batteryLevel:            [0x03,  7, bits(2, 0x07)],
+    charging:                [0x03,  7, bit(0x02)],
+    inputLevel:              [0x05,  6, u8],
+  },
+};
+
+const [T8, T16] = (() => {
+  const t8 = new Uint8Array(256);
+  const t16 = new Uint16Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    let k = i;
+    for (let j = 0; j < 8; j++) {
+      c = c & 1 ? (c >>> 1) ^ 0x8c : c >>> 1;
+      k = k & 1 ? (k >>> 1) ^ 0x8408 : k >>> 1;
+    }
+    t8[i] = c;
+    t16[i] = k;
+  }
+  return [t8, t16];
+})();
+
+function crc8(buf) {
+  let c = 0x77;
+  for (const b of buf) {
+    c = T8[c ^ b];
+  }
+  return c;
+}
+
+function crc16(buf) {
+  let c = 0x3692;
+  for (const b of buf) {
+    c = (c >>> 8) ^ T16[(c ^ b) & 0xff];
+  }
+  return c;
+}
+
+function dump(pkt) {
+  const pview = new DataView(pkt.buffer, pkt.byteOffset);
+  const hdr = pview.getUint16(1, true);
+  const pktVer = (hdr >>> 10) & 0x3f;
+  const pktLen = hdr & 0x3ff;
+  const data = pkt.subarray(11, -2);
+  const pktSeq = pview.getUint16(6, true);
+
+  const lines = [
+    `Ver: ${pktVer} Len: ${pktLen}(${data.length}) ` +
+    `Src: ${pkt[4].toString(16).padStart(2, '0')} Dst: ${pkt[5].toString(16).padStart(2, '0')} ` +
+    `Seq: ${pktSeq.toString(16).padStart(4, '0')} Type: ${pkt[8].toString(16).padStart(2, '0')} ` +
+    `Set: ${pkt[9].toString(16).padStart(2, '0')} ID: ${pkt[10].toString(16).padStart(2, '0')}`,
+  ];
+
+  for (let i = 0; i < data.length; i += 16) {
+    const chunk = [...data.subarray(i, i + 16)];
+    const hexArr = chunk.map((b) => b.toString(16).padStart(2, '0'));
+    const hexStr = [hexArr.slice(0, 8).join(' '), hexArr.slice(8).join(' ')].filter(Boolean).join('  ');
+    const asciiStr = chunk.map((b) => (32 <= b && b <= 126) ? String.fromCharCode(b) : '.').join('');
+    lines.push(`${i.toString(16).padStart(4, '0')}  ${hexStr.padEnd(48, ' ')}  |${asciiStr}|`);
+  }
+
+  return lines.join('\n');
+}
+
+const getNode = (node) => node !== 'tx' && node.startsWith('tx') ? 'txi' : node;
+
+function check(node, rule, write, typ, sz, base) {
+  if (write) {
+    if (rule.length < 5) return false;
+  } else {
+    if (rule[0] !== typ || base + rule[1] >= sz) return false;
+  }
+
+  const rName = rule.at(-1);
+  if (typeof rName !== 'string') return true;
+  if (!write && rName.startsWith('+')) return true;
+
+  let nodeName = null;
+  if (node === 'rx' || node === 'tx') {
+    nodeName = state.rx.deviceName;
+  } else if (node === 'tx1' || node === 'tx2') {
+    nodeName = state[node].deviceName;
+  }
+
+  return nodeName === (rName.startsWith('+') ? rName.slice(1) : rName);
+}
+
+const txQueue = [];
+let txWorker = null;
+
+async function drainTx() {
+  while (txQueue.length > 0) {
+    if (!usbDev?.opened) {
+      txQueue.length = 0;
+      break;
+    }
+    const pkt = txQueue.shift();
+    try {
+      await usbDev.transferOut(6, pkt);
+      if (debug) {
+        console.log(`${dump(pkt)}\n`);
+      }
+    } catch {}
+  }
+  txWorker = null;
+}
+
+async function send(nodeAddr, cmd, val) {
+  if (!usbDev) return;
+
+  const pkt = new Uint8Array(22);
+  const pview = new DataView(pkt.buffer);
+  pkt[0] = 0x55;
+  pkt.set([0x16, 0x04], 1);
+  pkt[3] = crc8(pkt.subarray(0, 3));
+  pkt.set([0x02, 0x5a], 4);
+  pview.setUint16(6, seq, true);
+  seq = (seq + 1) & 0xffff;
+  const addrLo = nodeAddr & 0xff;
+  const addrHi = (nodeAddr >>> 8) & 0xff;
+  pkt.set([
+    0x40, 0x5b, 0x01, 0x02, addrLo, addrHi, 0x00, 0x00,
+    cmd, 0x00, 0x01, val,
+  ], 8);
+  pview.setUint16(20, crc16(pkt.subarray(0, 20)), true);
+
+  txQueue.push(pkt);
+  if (!txWorker) {
+    txWorker = drainTx();
+  }
+  return txWorker;
+}
+
+const ctrl = new Proxy({}, {
+  get(_, node) {
+    if (!state[node]) return undefined;
+
+    return new Proxy(state[node], {
+      set(obj, key, val) {
+        if (!Object.hasOwn(obj, key) || obj[key] === val) return true;
+        const rule = RULES[getNode(node)][key];
+        if (!rule) return true;
+        if (!check(node, rule, true)) return true;
+        const enc = rule[4](val);
+        if (enc === null) return true;
+
+        send(ADDR[node], rule[3], enc).catch(() => {});
+        return true;
+      }
+    });
+  }
+});
+
+function scan(data) {
+  const sz = data.length;
+  if (sz < 4) return { typ: null, rx: null, tx1: null, tx2: null };
+
+  const blk = { typ: data[3], rx: null, tx1: null, tx2: null };
+
+  if (blk.typ === 0x01 && sz >= 45) {
+    blk.rx = 0;
+    let i = 45 + data[44];
+    while (i + 42 <= sz) {
+      if (data[i] === 0x01 && [1, 2].includes(data[i + 1])) {
+        blk[`tx${data[i + 1]}`] = i;
+      }
+      i += 42 + data[i + 41];
+    }
+    return blk;
+  }
+
+  if (blk.typ === 0x03 && sz >= 41) {
+    blk.rx = 0;
+    for (let i = 41; i < sz - 31; i += 32) {
+      if (data[i] === 0x02 && [1, 2].includes(data[i + 1])) {
+        blk[`tx${data[i + 1]}`] = i;
+      }
+    }
+    return blk;
+  }
+
+  if (blk.typ === 0x05 && sz >= 10) {
+    for (let i = 3; i < sz - 6; i += 7) {
+      if (data[i] === 0x05 && [1, 2].includes(data[i + 1])) {
+        blk[`tx${data[i + 1]}`] = i;
+      }
+    }
+    return blk;
+  }
+
+  return blk;
+}
+
+function read(node, data, typ, base, obj) {
+  for (const [key, rule] of Object.entries(RULES[getNode(node)])) {
+    if (!check(node, rule, false, typ, data.length, base)) continue;
+    obj[key] = rule[2](data, base + rule[1]);
+  }
+}
+
+const make = (node) => Object.fromEntries(Object.keys(RULES[node]).map((key) => [key, null]));
+
+function parse(pkt) {
+  if (pkt[9] !== 0x5b || pkt[10] !== 0x03) return;
+
+  const data = pkt.subarray(11, -2);
+  const blk = scan(data);
+
+  if (blk.rx !== null) {
+    read('rx', data, blk.typ, blk.rx, state.rx);
+  }
+
+  for (const n of [1, 2]) {
+    const base = blk[`tx${n}`];
+    if (base === null) {
+      if (blk.typ === 0x01 || blk.typ === 0x03) {
+        state[`tx${n}`] = null;
+      }
+      continue;
+    }
+    if (!state[`tx${n}`]) {
+      state[`tx${n}`] = make('txi');
+    }
+    read(`tx${n}`, data, blk.typ, base, state[`tx${n}`]);
+  }
+
+  if (blk.tx1 === null && blk.tx2 === null) {
+    if (blk.typ === 0x01 || blk.typ === 0x03) {
+      state.tx = make('tx');
+    }
+    return;
+  }
+  read('tx', data, blk.typ, blk.tx1 || blk.tx2, state.tx);
+}
+
+const prune = (_, val) => val === null ? undefined : val;
+
+function pick(node) {
+  if (!state || !state[node]) return undefined;
+  const rules = RULES[getNode(node)];
+  return Object.fromEntries(
+    Object.entries(state[node]).filter(([key]) => rules[key] && check(node, rules[key], true))
+  );
+}
+
+function sync() {
+  const cfg = { rx: pick('rx'), tx: pick('tx'), tx1: pick('tx1') || {}, tx2: pick('tx2') || {} };
+  for (const el of cfgInputs) {
+    const [node, key] = el.name.split('.');
+    const val = cfg[node]?.[key];
+    if (val === undefined || val === null) {
+      el.disabled = true;
+      continue;
+    }
+    el.disabled = false;
+    if (el.type === 'checkbox') {
+      el.checked = val;
+      continue;
+    }
+    if (el.type !== 'range') continue;
+    el.value = val;
+    const out = el.closest('div').querySelector('output');
+    if (!out) continue;
+    out.value = numFmt.format(val);
+  }
+}
+
+function apply() {
+  if (!state || !state.rx.deviceName) return;
+
+  let cfg;
+  try {
+    cfg = JSON.parse(cfgTxt.value);
+  } catch {
+    return;
+  }
+
+  if (!isObj(cfg)) return;
+
+  let spk;
+
+  if (ctrl.rx && isObj(cfg.rx)) {
+    spk = cfg.rx.plugFreeExternalSpeaker;
+    delete cfg.rx.plugFreeExternalSpeaker;
+    Object.assign(ctrl.rx, cfg.rx);
+  }
+
+  if (ctrl.tx && isObj(cfg.tx)) {
+    Object.assign(ctrl.tx, cfg.tx);
+  }
+
+  if (ctrl.tx1 && isObj(cfg.tx1)) {
+    Object.assign(ctrl.tx1, cfg.tx1);
+  }
+
+  if (ctrl.tx2 && isObj(cfg.tx2)) {
+    Object.assign(ctrl.tx2, cfg.tx2);
+  }
+
+  if (spk !== undefined && ctrl.rx) {
+    ctrl.rx.plugFreeExternalSpeaker = spk;
+  }
+}
+
+async function main() {
+  try {
+    usbDev = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x2ca3, productId: 0x4011 }] });
+    await usbDev.open();
+    if (!usbDev.configuration) {
+      await usbDev.selectConfiguration(1);
+    }
+    await usbDev.claimInterface(6);
+
+    state = { rx: make('rx'), tx: make('tx'), tx1: null, tx2: null };
+    seq = 0;
+    txQueue.length = 0;
+    txWorker = null;
+
+    let buf = new Uint8Array();
+    let last = '';
+    let lastCfg = '';
+
+    while (usbDev.opened) {
+      const res = await usbDev.transferIn(6, 1024);
+      if (res.status !== 'ok' || res.data.byteLength === 0) continue;
+
+      buf = concat(buf, new Uint8Array(res.data.buffer, res.data.byteOffset, res.data.byteLength));
+
+      while (buf.length) {
+        const idx = buf.indexOf(0x55);
+        if (idx < 0) {
+          buf = new Uint8Array();
+          break;
+        }
+        if (idx > 0) {
+          buf = buf.slice(idx);
+        }
+        if (buf.length < 4) break;
+        if (crc8(buf.subarray(0, 3)) !== buf[3]) {
+          buf = buf.slice(1);
+          continue;
+        }
+
+        const view = new DataView(buf.buffer, buf.byteOffset);
+        const sz = view.getUint16(1, true) & 0x3ff;
+        if (sz < 13) {
+          buf = buf.slice(1);
+          continue;
+        }
+        if (sz > buf.length) break;
+
+        const pkt = buf.slice(0, sz);
+        if (crc16(pkt.subarray(0, sz - 2)) !== new DataView(pkt.buffer, pkt.byteOffset).getUint16(sz - 2, true)) {
+          buf = buf.slice(1);
+          continue;
+        }
+        buf = buf.slice(sz);
+
+        if (debug) {
+          console.log(`${dump(pkt)}\n`);
+        }
+
+        parse(pkt);
+
+        const currCfg = JSON.stringify(
+          { rx: pick('rx'), tx: pick('tx'), tx1: pick('tx1'), tx2: pick('tx2') },
+          prune,
+          2,
+        );
+        if (currCfg !== lastCfg) {
+          sync();
+          applyBtn.disabled = !state.rx.deviceName;
+          cfgTxt.disabled = !state.rx.deviceName;
+          cfgTxt.value = currCfg;
+          lastCfg = currCfg;
+        }
+
+        const curr = JSON.stringify(state, prune, 2);
+        if (curr !== last) {
+          stateTxt.textContent = curr;
+          last = curr;
+        }
+      }
+    }
+  } finally {
+    state = null;
+    seq = 0;
+    txQueue.length = 0;
+
+    if (txWorker) {
+      await txWorker;
+    }
+    txWorker = null;
+
+    if (usbDev?.opened) {
+      try { await usbDev.close(); } catch {}
+    }
+    usbDev = null;
+  }
+}
+
+connBtn.addEventListener('click', async () => {
+  connBtn.disabled = true;
+  try {
+    await main();
+  } catch (e) {
+    stateTxt.textContent = JSON.stringify({ e: String(e) }, null, 2);
+  } finally {
+    sync();
+    applyBtn.disabled = true;
+    cfgTxt.disabled = true;
+    cfgTxt.value = '';
+    connBtn.disabled = false;
+  }
+});
+
+debugChk.addEventListener('change', (e) => debug = e.target.checked);
+
+cfgGrp.addEventListener('change', (e) => {
+  if (!state || !state.rx.deviceName || !e.target.name) return;
+
+  const [node, key] = e.target.name.split('.');
+
+  if (!node || !key || !RULES[getNode(node)]?.[key]) return;
+
+  const val = e.target.type === 'checkbox' ? e.target.checked : e.target.valueAsNumber;
+  if (ctrl[node]) {
+    ctrl[node][key] = val;
+  }
+});
+
+cfgGrp.addEventListener('input', (e) => {
+  if (e.target.type !== 'range') return;
+
+  const out = e.target.closest('div').querySelector('output');
+
+  if (!out) return;
+
+  out.value = numFmt.format(e.target.valueAsNumber);
+});
+
+applyBtn.addEventListener('click', async () => {
+  applyBtn.disabled = true;
+  cfgTxt.disabled = true;
+  apply();
+  if (txWorker) {
+    await txWorker;
+  }
+  applyBtn.disabled = !state || !state.rx.deviceName;
+  cfgTxt.disabled = !state || !state.rx.deviceName;
+});
+
+navigator.usb.addEventListener('disconnect', (e) => {
+  if (e.device !== usbDev) return;
+  try { usbDev.close(); } catch {}
+});
+
+sync();
+applyBtn.disabled = true;
+cfgTxt.disabled = true;
+</script>
+</body>
+</html>
