@@ -2,6 +2,7 @@ import argparse
 import contextlib
 import datetime
 import json
+import math
 import queue
 import signal
 import sys
@@ -55,6 +56,10 @@ def bl1(val):
 
 def bl2(val):
     return 2 if val is True else 0 if val is False else None
+
+
+def bl4(val):
+    return 4 if val is True else 0 if val is False else None
 
 
 def gain(val):
@@ -121,7 +126,7 @@ def dump(pkt):
     return "\n".join(lines)
 
 
-ADDR = {"rx": 0, "tx1": 1 << 0, "tx2": 1 << 1, "tx": 0xffff}
+ADDR = {"rx": 0x00, "tx1": 0x01, "tx2": 0x02, "tx3": 0x04, "tx4": 0x08, "tx": 0xffff}
 
 RULES = {
     "rx": {
@@ -129,21 +134,22 @@ RULES = {
         "serialNumber":            (0x01, 13, fstr(14)),
         "addressSuffix":           (0x01, 33, fstr(6)),
         "deviceName":              (0x01, 45, vstr),
-        "batteryLevel":            (0x03, 10, bits(5, 0x07), "DJI Mic Mini"),
-        "charging":                (0x03, 10, bit(0x10), "DJI Mic Mini"),
+        "batteryLevel":            (0x03, 10, bits(5, 0x07), "!DJI Mic Mini 2"),
+        "charging":                (0x03, 10, bit(0x10), "!DJI Mic Mini 2"),
         "stereo":                  (0x03, 10, bit(0x04), 0x08, bl2),
+        "quadraphonic":            (0x03, 10, bit(0x08), 0x08, bl4, "DJI Mic Mini 2S"),
         "safetyTrack":             (0x03, 37, bit(0x40), 0x21, bl1),
         "gainControl":             (0x03, 11, i8,        0x39, gain, "+DJI Mic Mini 2"),
         "monitoringGain":          (0x03, 16, i8,        0x26, gain1, "DJI Mic Mini 2"),
         "clippingControl":         (0x03, 37, bit(0x10), 0x1e, bl1),
-        "autoOff":                 (0x03, 10, bit(0x01), 0x10, bl1, "DJI Mic Mini"),
-        "receiverOnOffWithCamera": (0x03,  9, bit(0x80), 0x20, bl1, "DJI Mic Mini"),
+        "autoOff":                 (0x03, 10, bit(0x01), 0x10, bl1, "!DJI Mic Mini 2"),
+        "receiverOnOffWithCamera": (0x03,  9, bit(0x80), 0x20, bl1, "!DJI Mic Mini 2"),
         "plugFreeExternalSpeaker": (0x03, 37, bit(0x02), 0x23, bl1),
     },
     "tx": {
-        "noiseCancellation":          (0x03,  7, bit(0x01), 0x38, bl1, "+DJI Mic Mini"),
-        "noiseCancellationStrong":    (0x03,  6, bit(0x20), 0x37, bl1, "+DJI Mic Mini"),
-        "noiseCancellationViaButton": (0x03,  6, bit(0x80), 0x0f, bl1, "DJI Mic Mini"),
+        "noiseCancellation":          (0x03,  7, bit(0x01), 0x38, bl1, "-DJI Mic Mini 2"),
+        "noiseCancellationStrong":    (0x03,  6, bit(0x20), 0x37, bl1, "-DJI Mic Mini 2"),
+        "noiseCancellationViaButton": (0x03,  6, bit(0x80), 0x0f, bl1, "!DJI Mic Mini 2"),
         "lowCut":                     (0x03,  9, bit(0x20), 0x03, bl1),
         "clippingControl":            (0x03,  8, bit(0x04), 0x24, bl1),
         "loudnessBalance":            (0x03, 11, bit(0x80), 0x2c, bl2),
@@ -151,29 +157,34 @@ RULES = {
         "micLedOff":                  (0x03,  6, bit(0x02), 0x0a, bl2),
     },
     "txi": {
-        "firmwareVersion":         (0x01,  6, ver),
-        "serialNumber":            (0x01, 10, fstr(14)),
-        "addressSuffix":           (0x01, 30, fstr(6)),
-        "deviceName":              (0x01, 42, vstr),
-        "batteryLevel":            (0x03,  7, bits(2, 0x07)),
-        "charging":                (0x03,  7, bit(0x02)),
-        "inputLevel":              (0x05,  6, u8),
-        "rec":                     (0x03,  9, bit(0x10), 0x02, bl1, "DJI Mic Mini 2S"),
-        "transmitterGain":         (0x03, 13, i8,        0x39, gain1, "DJI Mic Mini 2S"),
-        "voiceToneRich":           (0x03,  9, bit(0x40), 0x29, bl1, "!DJI Mic Mini"),
-        "voiceToneBright":         (0x03,  9, bit(0x80), 0x29, bl2, "!DJI Mic Mini"),
-        "recordingTimeRemaining":  (0x03, 14, f16, "DJI Mic Mini 2S"),
-        "recordingTimeTotal":      (0x03, 16, f16, "DJI Mic Mini 2S"),
-        "fileOptionEditedFile":    (0x03, 31, bit(0x80), 0x3d, bl2, "DJI Mic Mini 2S"),
-        "float32Recording":        (0x03,  9, bit(0x08), 0x0c, bl1, "DJI Mic Mini 2S"),
-        "startupAutoRecording":    (0x03,  8, bit(0x80), 0x2e, bl1, "DJI Mic Mini 2S"),
-        "loopRecording":           (0x03, 11, bit(0x08), 0x2a, bl1, "DJI Mic Mini 2S"),
-        "recStop":                 (0x03, 11, bit(0x20), 0x0b, bl1, "DJI Mic Mini 2S"),
-        "vibration":               (0x03,  9, bit(0x01), 0x04, bl1, "DJI Mic Mini 2S"),
+        "firmwareVersion":           (0x01,  6, ver),
+        "serialNumber":              (0x01, 10, fstr(14)),
+        "addressSuffix":             (0x01, 30, fstr(6)),
+        "deviceName":                (0x01, 42, vstr),
+        "batteryLevel":              (0x03,  7, bits(2, 0x07)),
+        "charging":                  (0x03,  7, bit(0x02)),
+        "inputLevel":                (0x05,  6, u8),
+        "rec":                       (0x03,  9, bit(0x10), 0x02, bl1, "DJI Mic Mini 2S"),
+        "transmitterGain":           (0x03, 13, i8,        0x39, gain1, "DJI Mic Mini 2S"),
+        "voiceToneRich":             (0x03,  9, bit(0x40), 0x29, bl1, "!DJI Mic Mini"),
+        "voiceToneBright":           (0x03,  9, bit(0x80), 0x29, bl2, "!DJI Mic Mini"),
+        "recordingTimeRemaining":    (0x03, 14, f16, "DJI Mic Mini 2S"),
+        "recordingTimeTotal":        (0x03, 16, f16, "DJI Mic Mini 2S"),
+        "fileOptionEditedFile":      (0x03, 31, bit(0x80), 0x3d, bl2, "DJI Mic Mini 2S"),
+        "float32Recording":          (0x03,  9, bit(0x08), 0x0c, bl1, "DJI Mic Mini 2S"),
+        "startupAutoRecording1":     (0x03,  8, bit(0x80), 0x2e, bl1, "DJI Mic Mini 2S"), # Mobile / Mini RX
+        "startupAutoRecording2s":    (0x03, 31, bit(0x10), 0x3e, bl1, "DJI Mic Mini 2S"), # Mini 2S RX
+        "autoRecordingWithReceiver": (0x03, 31, bit(0x20), 0x3e, bl2, "DJI Mic Mini 2S"), # Mini 2S RX
+        "lowPowerAutoRecording"    : (0x03, 11, bit(0x10), 0x2b, bl1, "DJI Mic Mini 2S"), # Mini 2S RX
+        "loopRecording":             (0x03, 11, bit(0x08), 0x2a, bl1, "DJI Mic Mini 2S"),
+        "recStop":                   (0x03, 11, bit(0x20), 0x0b, bl1, "DJI Mic Mini 2S"),
+        "vibration":                 (0x03,  9, bit(0x01), 0x04, bl1, "DJI Mic Mini 2S"),
     },
 }
 
 usb_dev = None
+usb_if = None
+usb_ep = None
 state = None
 seq = 0
 debug = False
@@ -184,7 +195,7 @@ aborted = threading.Event()
 
 
 def to_node(node):
-    return "txi" if node in ("tx1", "tx2") else node
+    return "txi" if node in ("tx1", "tx2", "tx3", "tx4") else node
 
 
 def valid(node, rule, write=False, typ=None, sz=None, base=None):
@@ -195,48 +206,48 @@ def valid(node, rule, write=False, typ=None, sz=None, base=None):
 
     r_name = rule[-1]
     if not isinstance(r_name, str): return True
-    if not write and r_name.startswith("+"): return True
+    if not write and (r_name.startswith("+") or r_name.startswith("-")): return True
 
     node_name = None
     if node in ("rx", "tx"):
         node_name = state["rx"]["deviceName"]
-    elif node in ("tx1", "tx2"):
+    elif node in ("tx1", "tx2", "tx3", "tx4"):
         node_name = state[node]["deviceName"]
 
     if node_name is None:
         return False
 
-    if r_name.startswith("!"):
+    if r_name.startswith("!") or r_name.startswith("-"):
         return node_name != r_name[1:]
     return node_name == r_name.removeprefix("+")
 
 
 def scan(data):
     sz = len(data)
-    if sz < 4: return {"typ": None, "rx": None, "tx1": None, "tx2": None}
+    if sz < 4: return {"typ": None, "rx": None, "tx1": None, "tx2": None, "tx3": None, "tx4": None}
 
-    blk = {"typ": data[3], "rx": None, "tx1": None, "tx2": None}
+    blk = {"typ": data[3], "rx": None, "tx1": None, "tx2": None, "tx3": None, "tx4": None}
 
     if blk["typ"] == 0x01 and sz >= 45:
         blk["rx"] = 0
         i = 45 + data[44]
         while i + 42 <= sz:
-            if data[i] == 0x01 and data[i + 1] in (1, 2):
-                blk[f"tx{data[i + 1]}"] = i
+            if data[i] == 0x01 and data[i + 1] in (0x01, 0x02, 0x04, 0x08):
+                blk[f"tx{int(math.log2(data[i + 1])) + 1}"] = i
             i += 42 + data[i + 41]
         return blk
 
     if blk["typ"] == 0x03 and sz >= 41:
         blk["rx"] = 0
         for i in range(41, sz - 31, 32):
-            if data[i] == 0x02 and data[i + 1] in (1, 2):
-                blk[f"tx{data[i + 1]}"] = i
+            if data[i] == 0x02 and data[i + 1] in (0x01, 0x02, 0x04, 0x08):
+                blk[f"tx{int(math.log2(data[i + 1])) + 1}"] = i
         return blk
 
     if blk["typ"] == 0x05 and sz >= 10:
         for i in range(3, sz - 6, 7):
-            if data[i] == 0x05 and data[i + 1] in (1, 2):
-                blk[f"tx{data[i + 1]}"] = i
+            if data[i] == 0x05 and data[i + 1] in (0x01, 0x02, 0x04, 0x08):
+                blk[f"tx{int(math.log2(data[i + 1])) + 1}"] = i
         return blk
 
     return blk
@@ -261,7 +272,7 @@ def parse(pkt):
     if blk["rx"] is not None:
         read("rx", data, blk["typ"], blk["rx"], state["rx"])
 
-    for n in (1, 2):
+    for n in (1, 2, 3, 4):
         base = blk[f"tx{n}"]
         if base is None:
             if blk["typ"] in (0x01, 0x03):
@@ -272,14 +283,16 @@ def parse(pkt):
             state[f"tx{n}"] = init("txi")
         read(f"tx{n}", data, blk["typ"], base, state[f"tx{n}"])
 
-    if blk["tx1"] is None and blk["tx2"] is None:
+    if blk["tx1"] is None and blk["tx2"] is None and blk["tx3"] is None and blk["tx4"] is None:
         if blk["typ"] in (0x01, 0x03):
             state["tx"] = None
         return
 
     if state["tx"] is None:
         state["tx"] = init("tx")
-    read("tx", data, blk["typ"], blk["tx1"] if blk["tx1"] is not None else blk["tx2"], state["tx"])
+
+    base = next(b for b in (blk["tx1"], blk["tx2"], blk["tx3"], blk["tx4"]) if b is not None)
+    read("tx", data, blk["typ"], base, state["tx"])
 
 
 def send(node_addr, cmd, val):
@@ -400,6 +413,12 @@ def apply():
         if ctrl.tx2 and isinstance(tx2 := cfg.get("tx2"), dict):
             ctrl.tx2 |= tx2
 
+        if ctrl.tx3 and isinstance(tx3 := cfg.get("tx3"), dict):
+            ctrl.tx3 |= tx3
+
+        if ctrl.tx4 and isinstance(tx4 := cfg.get("tx4"), dict):
+            ctrl.tx4 |= tx4
+
         if spk is not None:
             ctrl.rx.plugFreeExternalSpeaker = spk
 
@@ -420,7 +439,7 @@ def poll():
 
 
 def match(d):
-    if d.idVendor != 0x2ca3 or d.idProduct != 0x4011:
+    if d.idVendor != 0x2ca3 or d.idProduct not in (0x4011, 0x4015, 0x4115):
         return False
     if device and device != f"{d.bus}:{d.address}":
         return False
@@ -431,7 +450,7 @@ def stream(dev):
     buf = b""
     while not aborted.is_set():
         try:
-            chunk = dev.read(0x86, 1024, timeout=10 if not tx_queue.empty() else 100)
+            chunk = dev.read(0x80 | usb_ep, 1024, timeout=10 if not tx_queue.empty() else 100)
             if chunk: buf += bytes(chunk)
         except usb.core.USBTimeoutError:
             yield None
@@ -472,7 +491,7 @@ def prune(d):
 
 
 def main():
-    global usb_dev, state, seq
+    global usb_dev, usb_if, usb_ep, state, seq
 
     devs = list(usb.core.find(find_all=True, custom_match=match))
 
@@ -487,6 +506,8 @@ def main():
         raise RuntimeError(f"Multiple devices found. Specify one using --device:\n{dev_list}")
 
     usb_dev = devs[0]
+    usb_if = 6 if usb_dev.idProduct == 0x4011 else 4
+    usb_ep = 6 if usb_dev.idProduct == 0x4011 else 4
 
     ucfg = None
     with contextlib.suppress(usb.core.USBError):
@@ -499,11 +520,14 @@ def main():
     detached = False
     try:
         with contextlib.suppress(NotImplementedError, usb.core.USBError):
-            usb_dev.detach_kernel_driver(6)
+            usb_dev.detach_kernel_driver(usb_if)
             detached = True
-        usb.util.claim_interface(usb_dev, 6)
+        usb.util.claim_interface(usb_dev, usb_if)
 
-        state = {"rx": init("rx"), "tx": None, "tx1": None, "tx2": None}
+        if usb_dev.idProduct != 0x4011:
+            usb_dev.set_interface_altsetting(interface=usb_if, alternate_setting=1)
+
+        state = {"rx": init("rx"), "tx": None, "tx1": None, "tx2": None, "tx3": None, "tx4": None}
         seq = 0
 
         last = ""
@@ -514,7 +538,7 @@ def main():
             with contextlib.suppress(queue.Empty):
                 tx_pkt = tx_queue.get_nowait()
                 with contextlib.suppress(usb.core.USBError):
-                    usb_dev.write(0x06, tx_pkt, timeout=1000)
+                    usb_dev.write(usb_ep, tx_pkt, timeout=1000)
                     if debug:
                         print(f"{dump(tx_pkt)}\n", file=sys.stderr, flush=True)
 
@@ -543,10 +567,10 @@ def main():
 
         if usb_dev:
             with contextlib.suppress(usb.core.USBError):
-                usb.util.release_interface(usb_dev, 6)
+                usb.util.release_interface(usb_dev, usb_if)
             if detached:
                 with contextlib.suppress(usb.core.USBError):
-                    usb_dev.attach_kernel_driver(6)
+                    usb_dev.attach_kernel_driver(usb_if)
             usb.util.dispose_resources(usb_dev)
             usb_dev = None
 

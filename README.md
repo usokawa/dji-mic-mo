@@ -27,32 +27,32 @@ No installation required. Manage your device instantly via WebUSB!
 Unlock the absolute full potential of your DJI Mic Mini/Mini 2/Mini 2S with real-time controls.
 
 > **Device Tags Legend:**
-> * `[Mini RX]`: DJI Mic Mini Receiver
 > * `[Mobile RX]`: DJI Mic Series Mobile Receiver
+> * `[Mini / 2S RX]`: DJI Mic Mini / Mini 2S Receiver
 > * `[Mini 2 / 2S]`: DJI Mic Mini 2 / Mini 2S Transmitter
 > * `[Mini 2S]`: DJI Mic Mini 2S Transmitter
 >
 > *(Features without tags are supported across all applicable devices)*
 
 ### 🎧 RX
-* **Audio Channel:** Choose Mono, Stereo, or Safety Track.
+* **Audio Channel:** Choose Mono, Stereo, Quadraphonic `[Mini 2S RX]`, or Safety Track.
 * **Gain:** Adjust Gain (-12dB to +12dB, 6dB steps) `[Mobile RX]` and Monitoring Gain `[Mobile RX]`.
-* **Config:** Toggle Clipping Control, Auto Off `[Mini RX]`, Receiver On/Off With Camera `[Mini RX]`, and Plug-Free External Speaker.
+* **Config:** Toggle Clipping Control, Auto Off `[Mini / 2S RX]`, Receiver On/Off With Camera `[Mini / 2S RX]`, and Plug-Free External Speaker.
 
 ### 🎤 TX
 * **Audio & NC:** Activate Low Cut, and choose Noise Cancellation mode (Off, Basic, Strong, or via button). Apply Voice Tone (Regular, Rich, Bright) `[Mini 2 / 2S]`, and control Transmitter Gain (1dB steps) `[Mini 2S]`.
 * **Gain Control:** Toggle Adaptive Gain Control settings: Clipping Control, and Loudness Balance `[Mini 2S]`.
-* **Internal Recording `[Mini 2S]`:** Start/Stop local recording, enable 32-bit Float Recording, Startup Auto Recording, Loop Recording, and configure File Options.
+* **Internal Recording `[Mini 2S]`:** Start/Stop local recording, enable 32-bit Float Recording, Auto Recording modes (Startup, With Receiver, Low Power), Loop Recording, and configure File Options.
 * **System & Config:** Toggle Auto Off, Mic LED Off, and Vibration `[Mini 2S]`.
 
 ### 📊 Live Telemetry
-* **Monitoring:** Track battery levels (1:Full, 7:Empty) and charging status *(Excludes Mobile RX)*, plus real-time device info.
+* **Monitoring:** Track battery levels (1:Full, 7:Empty) and charging status `[Mini / 2S RX]`, plus real-time device info.
 * **Recording Status `[Mini 2S]`:** Monitor Total and Remaining Recording Time dynamically.
 
 ## 💻 Compatibility
 
 * **Devices:**
-  * RX: DJI Mic Mini, DJI Mic Series Mobile Receiver
+  * RX: DJI Mic Series Mobile Receiver, DJI Mic Mini, DJI Mic Mini 2S
   * TX: DJI Mic Mini, DJI Mic Mini 2, DJI Mic Mini 2S
 * **Firmware:** V02 (Mini / Mini 2), V30 (Mini 2S)
 * **Browsers:** Chrome, Edge, Opera (or Chromium-based)

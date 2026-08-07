@@ -14,7 +14,7 @@
   box-sizing: border-box;
 }
 
-button, input {
+button, input, textarea {
   font: inherit;
 }
 
@@ -28,18 +28,32 @@ body {
   background-color: Canvas;
 }
 
-fieldset {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+fieldset, details {
   padding: 0.5rem;
   border: 1px solid ButtonBorder;
   border-radius: 0.5rem;
 
-  > fieldset {
-    align-items: flex-start;
-    padding: 0.5rem;
+  > legend {
+    padding: 0;
   }
+}
+
+details {
+  > summary {
+    border-radius: 0.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  > div {
+    padding-block-start: 0.5rem;
+  }
+}
+
+fieldset, details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 
   > div {
     display: flex;
@@ -48,8 +62,37 @@ fieldset {
   }
 }
 
-legend {
-  padding: 0;
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+:is(textarea, pre) {
+  inline-size: 100%;
+  margin: 0;
+  padding: 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 1rem;
+  color: CanvasText;
+  background-color: Canvas;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.25rem;
+}
+
+textarea {
+  display: block;
+  field-sizing: content;
+  resize: none;
+}
+
+pre {
+  overflow-inline: auto;
+}
+
+:is(button, summary, input[type="checkbox"]) {
+  transition: opacity var(--motion);
 }
 
 button {
@@ -59,13 +102,6 @@ button {
   background-color: ButtonFace;
   border: 1px solid ButtonBorder;
   border-radius: 0.25rem;
-  transition: opacity var(--motion);
-}
-
-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
 }
 
 input[type="checkbox"] {
@@ -78,7 +114,6 @@ input[type="checkbox"] {
   background-color: ButtonBorder;
   border: 1px solid transparent;
   border-radius: 1em;
-  transition: opacity var(--motion);
 
   &::before {
     content: "";
@@ -105,12 +140,17 @@ input[type="range"] {
   accent-color: LinkText;
 }
 
-:is(button, input):focus-visible {
+:is(button, input, summary, textarea):focus-visible {
   outline: 2px solid LinkText;
   outline-offset: 2px;
 }
 
-:is(button, input):not(:disabled):hover {
+textarea:focus-visible {
+  outline-offset: -1px;
+}
+
+:is(button, input):not(:disabled):hover,
+summary:hover {
   opacity: 0.5;
 }
 
@@ -122,46 +162,22 @@ input[type="range"] {
 }
 
 #cfgGrp {
-  > fieldset:not(:has(input:enabled)) {
+  > details:not(:has(:is(input, textarea):enabled)) {
     display: none;
   }
 
-  > fieldset > div:has(input:disabled) {
-    display: none;
+  > details:has(input) > div {
+    align-items: flex-start;
+
+    > div:has(input:disabled) {
+      display: none;
+    }
   }
-}
-
-:is(#cfgTxt, #stateTxt) {
-  inline-size: 100%;
-  margin: 0;
-  padding: 0.5rem;
-  font-family: ui-monospace, monospace;
-  font-size: 1rem;
-  color: CanvasText;
-  background-color: Canvas;
-  border: 1px solid ButtonBorder;
-  border-radius: 0.25rem;
-}
-
-#cfgTxt {
-  display: block;
-  field-sizing: content;
-  resize: none;
-
-  &:focus-visible {
-    outline: 2px solid LinkText;
-    outline-offset: -1px;
-  }
-}
-
-#stateTxt {
-  overflow-inline: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
-    transition-duration: 0.01ms !important;
-    transition-delay: 0s !important;
+    transition: none !important;
   }
 }
 
@@ -190,7 +206,7 @@ input[type="range"] {
     accent-color: Highlight;
   }
 
-  :is(button, input):focus-visible {
+  :is(button, input, summary, textarea):focus-visible {
     outline-color: Highlight;
   }
 }
@@ -206,75 +222,136 @@ input[type="range"] {
 </fieldset>
 <fieldset id="cfgGrp">
   <legend>Config</legend>
-  <fieldset>
-    <legend>RX</legend>
-    <div><label><input name="rx.stereo" type="checkbox"> Stereo</label></div>
-    <div><label><input name="rx.safetyTrack" type="checkbox"> Safety Track</label></div>
+  <details>
+    <summary>RX</summary>
     <div>
-      <label for="rx-gainControl">Gain Control (dB)</label>
-      <input id="rx-gainControl" name="rx.gainControl" type="range" min="-12" max="12" step="6" value="0">
-      <output for="rx-gainControl">0</output>
+      <div><label><input name="rx.stereo" type="checkbox"> Stereo</label></div>
+      <div><label><input name="rx.quadraphonic" type="checkbox"> Quadraphonic (Restart required)</label></div>
+      <div><label><input name="rx.safetyTrack" type="checkbox"> Safety Track</label></div>
+      <div>
+        <label for="rx-gainControl">Gain Control (dB)</label>
+        <input id="rx-gainControl" name="rx.gainControl" type="range" min="-12" max="12" step="6" value="0">
+        <output for="rx-gainControl">0</output>
+      </div>
+      <div>
+        <label for="rx-monitoringGain">Monitoring Gain (dB)</label>
+        <input id="rx-monitoringGain" name="rx.monitoringGain" type="range" min="-12" max="12" step="1" value="0">
+        <output for="rx-monitoringGain">0</output>
+      </div>
+      <div><label><input name="rx.clippingControl" type="checkbox"> Clipping Control</label></div>
+      <div><label><input name="rx.autoOff" type="checkbox"> Auto Off</label></div>
+      <div><label><input name="rx.receiverOnOffWithCamera" type="checkbox"> Receiver On/Off With Camera</label></div>
+      <div><label><input name="rx.plugFreeExternalSpeaker" type="checkbox"> Plug-Free External Speaker (Restart required)</label></div>
     </div>
+  </details>
+  <details>
+    <summary>TX</summary>
     <div>
-      <label for="rx-monitoringGain">Monitoring Gain (dB)</label>
-      <input id="rx-monitoringGain" name="rx.monitoringGain" type="range" min="-12" max="12" step="1" value="0">
-      <output for="rx-monitoringGain">0</output>
+      <div><label><input name="tx.noiseCancellation" type="checkbox"> Noise Cancellation</label></div>
+      <div><label><input name="tx.noiseCancellationStrong" type="checkbox"> Noise Cancellation: Strong</label></div>
+      <div><label><input name="tx.noiseCancellationViaButton" type="checkbox"> Noise Cancellation via Button</label></div>
+      <div><label><input name="tx.lowCut" type="checkbox"> Low Cut</label></div>
+      <div><label><input name="tx.clippingControl" type="checkbox"> Adaptive Gain Control: Clipping Control</label></div>
+      <div><label><input name="tx.loudnessBalance" type="checkbox"> Adaptive Gain Control: Loudness Balance</label></div>
+      <div><label><input name="tx.autoOff" type="checkbox"> Auto Off</label></div>
+      <div><label><input name="tx.micLedOff" type="checkbox"> Mic LED Off</label></div>
     </div>
-    <div><label><input name="rx.clippingControl" type="checkbox"> Clipping Control</label></div>
-    <div><label><input name="rx.autoOff" type="checkbox"> Auto Off</label></div>
-    <div><label><input name="rx.receiverOnOffWithCamera" type="checkbox"> Receiver On/Off With Camera</label></div>
-    <div><label><input name="rx.plugFreeExternalSpeaker" type="checkbox"> Plug-Free External Speaker (Restart required)</label></div>
-  </fieldset>
-  <fieldset>
-    <legend>TX</legend>
-    <div><label><input name="tx.noiseCancellation" type="checkbox"> Noise Cancellation</label></div>
-    <div><label><input name="tx.noiseCancellationStrong" type="checkbox"> Noise Cancellation: Strong</label></div>
-    <div><label><input name="tx.noiseCancellationViaButton" type="checkbox"> Noise Cancellation via Button</label></div>
-    <div><label><input name="tx.lowCut" type="checkbox"> Low Cut</label></div>
-    <div><label><input name="tx.clippingControl" type="checkbox"> Adaptive Gain Control: Clipping Control</label></div>
-    <div><label><input name="tx.loudnessBalance" type="checkbox"> Adaptive Gain Control: Loudness Balance</label></div>
-    <div><label><input name="tx.autoOff" type="checkbox"> Auto Off</label></div>
-    <div><label><input name="tx.micLedOff" type="checkbox"> Mic LED Off</label></div>
-  </fieldset>
-  <fieldset>
-    <legend>TX1</legend>
-    <div><label><input name="tx1.rec" type="checkbox"> REC</label></div>
+  </details>
+  <details>
+    <summary>TX1</summary>
     <div>
-      <label for="tx1-transmitterGain">Transmitter Gain (dB)</label>
-      <input id="tx1-transmitterGain" name="tx1.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
-      <output for="tx1-transmitterGain">0</output>
+      <div><label><input name="tx1.rec" type="checkbox"> REC</label></div>
+      <div>
+        <label for="tx1-transmitterGain">Transmitter Gain (dB)</label>
+        <input id="tx1-transmitterGain" name="tx1.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
+        <output for="tx1-transmitterGain">0</output>
+      </div>
+      <div><label><input name="tx1.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
+      <div><label><input name="tx1.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+      <div><label><input name="tx1.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
+      <div><label><input name="tx1.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
+      <div><label><input name="tx1.startupAutoRecording1" type="checkbox"> Startup Auto Recording (Mobile / Mini RX)</label></div>
+      <div><label><input name="tx1.startupAutoRecording2s" type="checkbox"> Startup Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx1.autoRecordingWithReceiver" type="checkbox"> Auto Recording With Receiver (Mini 2S RX)</label></div>
+      <div><label><input name="tx1.lowPowerAutoRecording" type="checkbox"> Low Power Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx1.loopRecording" type="checkbox"> Loop Recording</label></div>
+      <div><label><input name="tx1.recStop" type="checkbox"> REC Stop</label></div>
+      <div><label><input name="tx1.vibration" type="checkbox"> Vibration</label></div>
     </div>
-    <div><label><input name="tx1.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
-    <div><label><input name="tx1.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
-    <div><label><input name="tx1.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
-    <div><label><input name="tx1.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
-    <div><label><input name="tx1.startupAutoRecording" type="checkbox"> Startup Auto Recording</label></div>
-    <div><label><input name="tx1.loopRecording" type="checkbox"> Loop Recording</label></div>
-    <div><label><input name="tx1.recStop" type="checkbox"> REC Stop</label></div>
-    <div><label><input name="tx1.vibration" type="checkbox"> Vibration</label></div>
-  </fieldset>
-  <fieldset>
-    <legend>TX2</legend>
-    <div><label><input name="tx2.rec" type="checkbox"> REC</label></div>
+  </details>
+  <details>
+    <summary>TX2</summary>
     <div>
-      <label for="tx2-transmitterGain">Transmitter Gain (dB)</label>
-      <input id="tx2-transmitterGain" name="tx2.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
-      <output for="tx2-transmitterGain">0</output>
+      <div><label><input name="tx2.rec" type="checkbox"> REC</label></div>
+      <div>
+        <label for="tx2-transmitterGain">Transmitter Gain (dB)</label>
+        <input id="tx2-transmitterGain" name="tx2.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
+        <output for="tx2-transmitterGain">0</output>
+      </div>
+      <div><label><input name="tx2.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
+      <div><label><input name="tx2.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+      <div><label><input name="tx2.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
+      <div><label><input name="tx2.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
+      <div><label><input name="tx2.startupAutoRecording1" type="checkbox"> Startup Auto Recording (Mobile / Mini RX)</label></div>
+      <div><label><input name="tx2.startupAutoRecording2s" type="checkbox"> Startup Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx2.autoRecordingWithReceiver" type="checkbox"> Auto Recording With Receiver (Mini 2S RX)</label></div>
+      <div><label><input name="tx2.lowPowerAutoRecording" type="checkbox"> Low Power Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx2.loopRecording" type="checkbox"> Loop Recording</label></div>
+      <div><label><input name="tx2.recStop" type="checkbox"> REC Stop</label></div>
+      <div><label><input name="tx2.vibration" type="checkbox"> Vibration</label></div>
     </div>
-    <div><label><input name="tx2.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
-    <div><label><input name="tx2.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
-    <div><label><input name="tx2.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
-    <div><label><input name="tx2.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
-    <div><label><input name="tx2.startupAutoRecording" type="checkbox"> Startup Auto Recording</label></div>
-    <div><label><input name="tx2.loopRecording" type="checkbox"> Loop Recording</label></div>
-    <div><label><input name="tx2.recStop" type="checkbox"> REC Stop</label></div>
-    <div><label><input name="tx2.vibration" type="checkbox"> Vibration</label></div>
-  </fieldset>
-</fieldset>
-<fieldset id="jsonGrp">
-  <legend>Config (JSON)</legend>
-  <div><textarea id="cfgTxt" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></div>
-  <div><button id="applyBtn" type="button">Apply</button></div>
+  </details>
+  <details>
+    <summary>TX3</summary>
+    <div>
+      <div><label><input name="tx3.rec" type="checkbox"> REC</label></div>
+      <div>
+        <label for="tx3-transmitterGain">Transmitter Gain (dB)</label>
+        <input id="tx3-transmitterGain" name="tx3.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
+        <output for="tx3-transmitterGain">0</output>
+      </div>
+      <div><label><input name="tx3.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
+      <div><label><input name="tx3.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+      <div><label><input name="tx3.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
+      <div><label><input name="tx3.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
+      <div><label><input name="tx3.startupAutoRecording1" type="checkbox"> Startup Auto Recording (Mobile / Mini RX)</label></div>
+      <div><label><input name="tx3.startupAutoRecording2s" type="checkbox"> Startup Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx3.autoRecordingWithReceiver" type="checkbox"> Auto Recording With Receiver (Mini 2S RX)</label></div>
+      <div><label><input name="tx3.lowPowerAutoRecording" type="checkbox"> Low Power Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx3.loopRecording" type="checkbox"> Loop Recording</label></div>
+      <div><label><input name="tx3.recStop" type="checkbox"> REC Stop</label></div>
+      <div><label><input name="tx3.vibration" type="checkbox"> Vibration</label></div>
+    </div>
+  </details>
+  <details>
+    <summary>TX4</summary>
+    <div>
+      <div><label><input name="tx4.rec" type="checkbox"> REC</label></div>
+      <div>
+        <label for="tx4-transmitterGain">Transmitter Gain (dB)</label>
+        <input id="tx4-transmitterGain" name="tx4.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
+        <output for="tx4-transmitterGain">0</output>
+      </div>
+      <div><label><input name="tx4.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
+      <div><label><input name="tx4.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+      <div><label><input name="tx4.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
+      <div><label><input name="tx4.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
+      <div><label><input name="tx4.startupAutoRecording1" type="checkbox"> Startup Auto Recording (Mobile / Mini RX)</label></div>
+      <div><label><input name="tx4.startupAutoRecording2s" type="checkbox"> Startup Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx4.autoRecordingWithReceiver" type="checkbox"> Auto Recording With Receiver (Mini 2S RX)</label></div>
+      <div><label><input name="tx4.lowPowerAutoRecording" type="checkbox"> Low Power Auto Recording (Mini 2S RX)</label></div>
+      <div><label><input name="tx4.loopRecording" type="checkbox"> Loop Recording</label></div>
+      <div><label><input name="tx4.recStop" type="checkbox"> REC Stop</label></div>
+      <div><label><input name="tx4.vibration" type="checkbox"> Vibration</label></div>
+    </div>
+  </details>
+  <details>
+    <summary>JSON</summary>
+    <div>
+      <div><textarea id="cfgTxt" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></div>
+      <div><button id="applyBtn" type="button">Apply</button></div>
+    </div>
+  </details>
 </fieldset>
 <fieldset id="stateGrp">
   <legend>State</legend>
@@ -322,6 +399,7 @@ const bit = (mask) => (buf, off) => Boolean(buf[off] & mask);
 
 const bl1 = (val) => val === true ? 1 : val === false ? 0 : null;
 const bl2 = (val) => val === true ? 2 : val === false ? 0 : null;
+const bl4 = (val) => val === true ? 4 : val === false ? 0 : null;
 const gain = (val) => [-12, -6, 0, 6, 12].includes(val) ? val & 0xff : null;
 const gain1 = (val) => Number.isInteger(val) && val >= -12 && val <= 12 ? val & 0xff : null;
 
@@ -384,7 +462,7 @@ function dump(pkt) {
   return lines.join('\n');
 }
 
-const ADDR = { rx: 0, tx1: 1 << 0, tx2: 1 << 1, tx: 0xffff };
+const ADDR = { rx: 0x00, tx1: 0x01, tx2: 0x02, tx3: 0x04, tx4: 0x08, tx: 0xffff };
 
 const RULES = {
   rx: {
@@ -392,21 +470,22 @@ const RULES = {
     serialNumber:            [0x01, 13, fstr(14)],
     addressSuffix:           [0x01, 33, fstr(6)],
     deviceName:              [0x01, 45, vstr],
-    batteryLevel:            [0x03, 10, bits(5, 0x07), 'DJI Mic Mini'],
-    charging:                [0x03, 10, bit(0x10), 'DJI Mic Mini'],
+    batteryLevel:            [0x03, 10, bits(5, 0x07), '!DJI Mic Mini 2'],
+    charging:                [0x03, 10, bit(0x10), '!DJI Mic Mini 2'],
     stereo:                  [0x03, 10, bit(0x04), 0x08, bl2],
+    quadraphonic:            [0x03, 10, bit(0x08), 0x08, bl4, 'DJI Mic Mini 2S'],
     safetyTrack:             [0x03, 37, bit(0x40), 0x21, bl1],
     gainControl:             [0x03, 11, i8,        0x39, gain, '+DJI Mic Mini 2'],
     monitoringGain:          [0x03, 16, i8,        0x26, gain1, 'DJI Mic Mini 2'],
     clippingControl:         [0x03, 37, bit(0x10), 0x1e, bl1],
-    autoOff:                 [0x03, 10, bit(0x01), 0x10, bl1, 'DJI Mic Mini'],
-    receiverOnOffWithCamera: [0x03,  9, bit(0x80), 0x20, bl1, 'DJI Mic Mini'],
+    autoOff:                 [0x03, 10, bit(0x01), 0x10, bl1, '!DJI Mic Mini 2'],
+    receiverOnOffWithCamera: [0x03,  9, bit(0x80), 0x20, bl1, '!DJI Mic Mini 2'],
     plugFreeExternalSpeaker: [0x03, 37, bit(0x02), 0x23, bl1],
   },
   tx: {
-    noiseCancellation:          [0x03,  7, bit(0x01), 0x38, bl1, '+DJI Mic Mini'],
-    noiseCancellationStrong:    [0x03,  6, bit(0x20), 0x37, bl1, '+DJI Mic Mini'],
-    noiseCancellationViaButton: [0x03,  6, bit(0x80), 0x0f, bl1, 'DJI Mic Mini'],
+    noiseCancellation:          [0x03,  7, bit(0x01), 0x38, bl1, '-DJI Mic Mini 2'],
+    noiseCancellationStrong:    [0x03,  6, bit(0x20), 0x37, bl1, '-DJI Mic Mini 2'],
+    noiseCancellationViaButton: [0x03,  6, bit(0x80), 0x0f, bl1, '!DJI Mic Mini 2'],
     lowCut:                     [0x03,  9, bit(0x20), 0x03, bl1],
     clippingControl:            [0x03,  8, bit(0x04), 0x24, bl1],
     loudnessBalance:            [0x03, 11, bit(0x80), 0x2c, bl2],
@@ -414,29 +493,34 @@ const RULES = {
     micLedOff:                  [0x03,  6, bit(0x02), 0x0a, bl2],
   },
   txi: {
-    firmwareVersion:         [0x01,  6, ver],
-    serialNumber:            [0x01, 10, fstr(14)],
-    addressSuffix:           [0x01, 30, fstr(6)],
-    deviceName:              [0x01, 42, vstr],
-    batteryLevel:            [0x03,  7, bits(2, 0x07)],
-    charging:                [0x03,  7, bit(0x02)],
-    inputLevel:              [0x05,  6, u8],
-    rec:                     [0x03,  9, bit(0x10), 0x02, bl1, 'DJI Mic Mini 2S'],
-    transmitterGain:         [0x03, 13, i8,        0x39, gain1, 'DJI Mic Mini 2S'],
-    voiceToneRich:           [0x03,  9, bit(0x40), 0x29, bl1, '!DJI Mic Mini'],
-    voiceToneBright:         [0x03,  9, bit(0x80), 0x29, bl2, '!DJI Mic Mini'],
-    recordingTimeRemaining:  [0x03, 14, f16, 'DJI Mic Mini 2S'],
-    recordingTimeTotal:      [0x03, 16, f16, 'DJI Mic Mini 2S'],
-    fileOptionEditedFile:    [0x03, 31, bit(0x80), 0x3d, bl2, 'DJI Mic Mini 2S'],
-    float32Recording:        [0x03,  9, bit(0x08), 0x0c, bl1, 'DJI Mic Mini 2S'],
-    startupAutoRecording:    [0x03,  8, bit(0x80), 0x2e, bl1, 'DJI Mic Mini 2S'],
-    loopRecording:           [0x03, 11, bit(0x08), 0x2a, bl1, 'DJI Mic Mini 2S'],
-    recStop:                 [0x03, 11, bit(0x20), 0x0b, bl1, 'DJI Mic Mini 2S'],
-    vibration:               [0x03,  9, bit(0x01), 0x04, bl1, 'DJI Mic Mini 2S'],
+    firmwareVersion:           [0x01,  6, ver],
+    serialNumber:              [0x01, 10, fstr(14)],
+    addressSuffix:             [0x01, 30, fstr(6)],
+    deviceName:                [0x01, 42, vstr],
+    batteryLevel:              [0x03,  7, bits(2, 0x07)],
+    charging:                  [0x03,  7, bit(0x02)],
+    inputLevel:                [0x05,  6, u8],
+    rec:                       [0x03,  9, bit(0x10), 0x02, bl1, 'DJI Mic Mini 2S'],
+    transmitterGain:           [0x03, 13, i8,        0x39, gain1, 'DJI Mic Mini 2S'],
+    voiceToneRich:             [0x03,  9, bit(0x40), 0x29, bl1, '!DJI Mic Mini'],
+    voiceToneBright:           [0x03,  9, bit(0x80), 0x29, bl2, '!DJI Mic Mini'],
+    recordingTimeRemaining:    [0x03, 14, f16, 'DJI Mic Mini 2S'],
+    recordingTimeTotal:        [0x03, 16, f16, 'DJI Mic Mini 2S'],
+    fileOptionEditedFile:      [0x03, 31, bit(0x80), 0x3d, bl2, 'DJI Mic Mini 2S'],
+    float32Recording:          [0x03,  9, bit(0x08), 0x0c, bl1, 'DJI Mic Mini 2S'],
+    startupAutoRecording1:     [0x03,  8, bit(0x80), 0x2e, bl1, 'DJI Mic Mini 2S'], // Mobile / Mini RX
+    startupAutoRecording2s:    [0x03, 31, bit(0x10), 0x3e, bl1, 'DJI Mic Mini 2S'], // Mini 2S RX
+    autoRecordingWithReceiver: [0x03, 31, bit(0x20), 0x3e, bl2, 'DJI Mic Mini 2S'], // Mini 2S RX
+    lowPowerAutoRecording:     [0x03, 11, bit(0x10), 0x2b, bl1, 'DJI Mic Mini 2S'], // Mini 2S RX
+    loopRecording:             [0x03, 11, bit(0x08), 0x2a, bl1, 'DJI Mic Mini 2S'],
+    recStop:                   [0x03, 11, bit(0x20), 0x0b, bl1, 'DJI Mic Mini 2S'],
+    vibration:                 [0x03,  9, bit(0x01), 0x04, bl1, 'DJI Mic Mini 2S'],
   },
 };
 
 let usbDev = null;
+let usbIf = null;
+let usbEp = null;
 let state = null;
 let seq = 0;
 let debug = false;
@@ -445,7 +529,7 @@ const txQueue = [];
 let txWorker = null;
 
 function toNode(node) {
-  return ['tx1', 'tx2'].includes(node) ? 'txi' : node;
+  return ['tx1', 'tx2', 'tx3', 'tx4'].includes(node) ? 'txi' : node;
 }
 
 function valid(node, rule, write = false, typ = null, sz = null, base = null) {
@@ -457,18 +541,18 @@ function valid(node, rule, write = false, typ = null, sz = null, base = null) {
 
   const rName = rule.at(-1);
   if (typeof rName !== 'string') { return true; }
-  if (!write && rName.startsWith('+')) { return true; }
+  if (!write && (rName.startsWith('+') || rName.startsWith('-'))) { return true; }
 
   let nodeName = null;
   if (['rx', 'tx'].includes(node)) {
     nodeName = state.rx.deviceName;
-  } else if (['tx1', 'tx2'].includes(node)) {
+  } else if (['tx1', 'tx2', 'tx3', 'tx4'].includes(node)) {
     nodeName = state[node].deviceName;
   }
 
   if (nodeName === null) { return false; }
 
-  if (rName.startsWith('!')) {
+  if (rName.startsWith('!') || rName.startsWith('-')) {
     return nodeName !== rName.slice(1);
   }
   return nodeName === (rName.startsWith('+') ? rName.slice(1) : rName);
@@ -476,16 +560,16 @@ function valid(node, rule, write = false, typ = null, sz = null, base = null) {
 
 function scan(data) {
   const sz = data.length;
-  if (sz < 4) { return { typ: null, rx: null, tx1: null, tx2: null }; }
+  if (sz < 4) { return { typ: null, rx: null, tx1: null, tx2: null, tx3: null, tx4: null }; }
 
-  const blk = { typ: data[3], rx: null, tx1: null, tx2: null };
+  const blk = { typ: data[3], rx: null, tx1: null, tx2: null, tx3: null, tx4: null };
 
   if (blk.typ === 0x01 && sz >= 45) {
     blk.rx = 0;
     let i = 45 + data[44];
     while (i + 42 <= sz) {
-      if (data[i] === 0x01 && [1, 2].includes(data[i + 1])) {
-        blk[`tx${data[i + 1]}`] = i;
+      if (data[i] === 0x01 && [0x01, 0x02, 0x04, 0x08].includes(data[i + 1])) {
+        blk[`tx${Math.log2(data[i + 1]) + 1}`] = i;
       }
       i += 42 + data[i + 41];
     }
@@ -495,8 +579,8 @@ function scan(data) {
   if (blk.typ === 0x03 && sz >= 41) {
     blk.rx = 0;
     for (let i = 41; i < sz - 31; i += 32) {
-      if (data[i] === 0x02 && [1, 2].includes(data[i + 1])) {
-        blk[`tx${data[i + 1]}`] = i;
+      if (data[i] === 0x02 && [0x01, 0x02, 0x04, 0x08].includes(data[i + 1])) {
+        blk[`tx${Math.log2(data[i + 1]) + 1}`] = i;
       }
     }
     return blk;
@@ -504,8 +588,8 @@ function scan(data) {
 
   if (blk.typ === 0x05 && sz >= 10) {
     for (let i = 3; i < sz - 6; i += 7) {
-      if (data[i] === 0x05 && [1, 2].includes(data[i + 1])) {
-        blk[`tx${data[i + 1]}`] = i;
+      if (data[i] === 0x05 && [0x01, 0x02, 0x04, 0x08].includes(data[i + 1])) {
+        blk[`tx${Math.log2(data[i + 1]) + 1}`] = i;
       }
     }
     return blk;
@@ -535,7 +619,7 @@ function parse(pkt) {
     read('rx', data, blk.typ, blk.rx, state.rx);
   }
 
-  for (const n of [1, 2]) {
+  for (const n of [1, 2, 3, 4]) {
     const base = blk[`tx${n}`];
     if (base === null) {
       if (blk.typ === 0x01 || blk.typ === 0x03) {
@@ -550,7 +634,7 @@ function parse(pkt) {
     read(`tx${n}`, data, blk.typ, base, state[`tx${n}`]);
   }
 
-  if (blk.tx1 === null && blk.tx2 === null) {
+  if (blk.tx1 === null && blk.tx2 === null && blk.tx3 === null && blk.tx4 === null) {
     if (blk.typ === 0x01 || blk.typ === 0x03) {
       state.tx = null;
     }
@@ -560,7 +644,9 @@ function parse(pkt) {
   if (!state.tx) {
     state.tx = init('tx');
   }
-  read('tx', data, blk.typ, blk.tx1 ?? blk.tx2, state.tx);
+
+  const base = [blk.tx1, blk.tx2, blk.tx3, blk.tx4].find((b) => b !== null);
+  read('tx', data, blk.typ, base, state.tx);
 }
 
 async function flush() {
@@ -571,7 +657,7 @@ async function flush() {
     }
     const pkt = txQueue.shift();
     try {
-      await usbDev.transferOut(6, pkt);
+      await usbDev.transferOut(usbEp, pkt);
       if (debug) {
         console.log(`${dump(pkt)}\n`);
       }
@@ -655,13 +741,12 @@ const ctrl = new Proxy({}, {
 function pick(node) {
   if (!state?.[node]) { return undefined; }
   const rules = RULES[toNode(node)];
-  return Object.fromEntries(
-    Object.entries(state[node]).filter(([key]) => rules[key] && valid(node, rules[key], true))
-  );
+  const entries = Object.entries(state[node]).filter(([key]) => rules[key] && valid(node, rules[key], true));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
 }
 
 function sync() {
-  const cfg = { rx: pick('rx'), tx: pick('tx'), tx1: pick('tx1'), tx2: pick('tx2') };
+  const cfg = { rx: pick('rx'), tx: pick('tx'), tx1: pick('tx1'), tx2: pick('tx2'), tx3: pick('tx3'), tx4: pick('tx4') };
   for (const el of cfgInputs) {
     const [node, key] = el.name.split('.');
     const val = cfg[node]?.[key];
@@ -713,6 +798,14 @@ function apply() {
       Object.assign(ctrl.tx2, cfg.tx2);
     }
 
+    if (ctrl.tx3 && isObj(cfg.tx3)) {
+      Object.assign(ctrl.tx3, cfg.tx3);
+    }
+
+    if (ctrl.tx4 && isObj(cfg.tx4)) {
+      Object.assign(ctrl.tx4, cfg.tx4);
+    }
+
     if (spk !== undefined) {
       ctrl.rx.plugFreeExternalSpeaker = spk;
     }
@@ -722,7 +815,7 @@ function apply() {
 async function* stream(dev) {
   let buf = new Uint8Array();
   while (dev.opened) {
-    const res = await dev.transferIn(6, 1024);
+    const res = await dev.transferIn(usbEp, 1024);
     if (res.status !== 'ok' || res.data.byteLength === 0) { continue; }
 
     buf = concat(buf, new Uint8Array(res.data.buffer, res.data.byteOffset, res.data.byteLength));
@@ -768,14 +861,28 @@ const prune = (_, val) => val === null ? undefined : val;
 
 async function main() {
   try {
-    usbDev = await navigator.usb.requestDevice({ filters: [{ vendorId: 0x2ca3, productId: 0x4011 }] });
+    usbDev = await navigator.usb.requestDevice({
+      filters: [
+        { vendorId: 0x2ca3, productId: 0x4011 },
+        { vendorId: 0x2ca3, productId: 0x4015 },
+        { vendorId: 0x2ca3, productId: 0x4115 },
+      ]
+    });
     await usbDev.open();
     if (!usbDev.configuration) {
       await usbDev.selectConfiguration(1);
     }
-    await usbDev.claimInterface(6);
 
-    state = { rx: init('rx'), tx: null, tx1: null, tx2: null };
+    usbIf = usbDev.productId === 0x4011 ? 6 : 4;
+    usbEp = usbDev.productId === 0x4011 ? 6 : 4;
+
+    await usbDev.claimInterface(usbIf);
+
+    if (usbDev.productId !== 0x4011) {
+      await usbDev.selectAlternateInterface(usbIf, 1);
+    }
+
+    state = { rx: init('rx'), tx: null, tx1: null, tx2: null, tx3: null, tx4: null };
     seq = 0;
     cfgQueue.length = 0;
     txQueue.length = 0;
@@ -792,7 +899,7 @@ async function main() {
       parse(pkt);
 
       const currCfg = JSON.stringify(
-        { rx: pick('rx'), tx: pick('tx'), tx1: pick('tx1'), tx2: pick('tx2') },
+        { rx: pick('rx'), tx: pick('tx'), tx1: pick('tx1'), tx2: pick('tx2'), tx3: pick('tx3'), tx4: pick('tx4') },
         prune,
         2,
       );

@@ -1,1 +1,6 @@
+# Mobile RX / Mini RX
 SUBSYSTEM=="usb", ATTR{idVendor}=="2ca3", ATTR{idProduct}=="4011", MODE="0666"
+# Mini 2S RX (Mono/Stereo)
+SUBSYSTEM=="usb", ATTR{idVendor}=="2ca3", ATTR{idProduct}=="4015", MODE="0666"
+# Mini 2S RX (Quadraphonic)
+SUBSYSTEM=="usb", ATTR{idVendor}=="2ca3", ATTR{idProduct}=="4115", MODE="0666"
