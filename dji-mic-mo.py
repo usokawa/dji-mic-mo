@@ -1,5 +1,6 @@
 import argparse
 import contextlib
+import datetime
 import json
 import queue
 import signal
@@ -26,6 +27,10 @@ def fstr(sz):
 
 def vstr(buf, off):
     return buf[off : off + buf[off - 1]].decode(errors="replace")
+
+
+def f16(buf, off):
+    return int.from_bytes(buf[off : off + 2], "little") / 10
 
 
 def i8(buf, off):
@@ -56,7 +61,7 @@ def gain(val):
     return int(val) & 0xff if type(val) in (int, float) and val in (-12, -6, 0, 6, 12) else None
 
 
-def mgain(val):
+def gain1(val):
     return int(val) & 0xff if type(val) in (int, float) and -12 <= val <= 12 and int(val) == val else None
 
 
@@ -129,7 +134,7 @@ RULES = {
         "stereo":                  (0x03, 10, bit(0x04), 0x08, bl2),
         "safetyTrack":             (0x03, 37, bit(0x40), 0x21, bl1),
         "gainControl":             (0x03, 11, i8,        0x39, gain, "+DJI Mic Mini 2"),
-        "monitoringGain":          (0x03, 16, i8,        0x26, mgain, "DJI Mic Mini 2"),
+        "monitoringGain":          (0x03, 16, i8,        0x26, gain1, "DJI Mic Mini 2"),
         "clippingControl":         (0x03, 37, bit(0x10), 0x1e, bl1),
         "autoOff":                 (0x03, 10, bit(0x01), 0x10, bl1, "DJI Mic Mini"),
         "receiverOnOffWithCamera": (0x03,  9, bit(0x80), 0x20, bl1, "DJI Mic Mini"),
@@ -140,6 +145,8 @@ RULES = {
         "noiseCancellationStrong":    (0x03,  6, bit(0x20), 0x37, bl1, "+DJI Mic Mini"),
         "noiseCancellationViaButton": (0x03,  6, bit(0x80), 0x0f, bl1, "DJI Mic Mini"),
         "lowCut":                     (0x03,  9, bit(0x20), 0x03, bl1),
+        "clippingControl":            (0x03,  8, bit(0x04), 0x24, bl1),
+        "loudnessBalance":            (0x03, 11, bit(0x80), 0x2c, bl2),
         "autoOff":                    (0x03,  6, bit(0x10), 0x10, bl1),
         "micLedOff":                  (0x03,  6, bit(0x02), 0x0a, bl2),
     },
@@ -151,8 +158,18 @@ RULES = {
         "batteryLevel":            (0x03,  7, bits(2, 0x07)),
         "charging":                (0x03,  7, bit(0x02)),
         "inputLevel":              (0x05,  6, u8),
-        "voiceToneRich":           (0x03,  9, bit(0x40), 0x29, bl1, "DJI Mic Mini 2"),
-        "voiceToneBright":         (0x03,  9, bit(0x80), 0x29, bl2, "DJI Mic Mini 2"),
+        "rec":                     (0x03,  9, bit(0x10), 0x02, bl1, "DJI Mic Mini 2S"),
+        "transmitterGain":         (0x03, 13, i8,        0x39, gain1, "DJI Mic Mini 2S"),
+        "voiceToneRich":           (0x03,  9, bit(0x40), 0x29, bl1, "!DJI Mic Mini"),
+        "voiceToneBright":         (0x03,  9, bit(0x80), 0x29, bl2, "!DJI Mic Mini"),
+        "recordingTimeRemaining":  (0x03, 14, f16, "DJI Mic Mini 2S"),
+        "recordingTimeTotal":      (0x03, 16, f16, "DJI Mic Mini 2S"),
+        "fileOptionEditedFile":    (0x03, 31, bit(0x80), 0x3d, bl2, "DJI Mic Mini 2S"),
+        "float32Recording":        (0x03,  9, bit(0x08), 0x0c, bl1, "DJI Mic Mini 2S"),
+        "startupAutoRecording":    (0x03,  8, bit(0x80), 0x2e, bl1, "DJI Mic Mini 2S"),
+        "loopRecording":           (0x03, 11, bit(0x08), 0x2a, bl1, "DJI Mic Mini 2S"),
+        "recStop":                 (0x03, 11, bit(0x20), 0x0b, bl1, "DJI Mic Mini 2S"),
+        "vibration":               (0x03,  9, bit(0x01), 0x04, bl1, "DJI Mic Mini 2S"),
     },
 }
 
@@ -186,6 +203,11 @@ def valid(node, rule, write=False, typ=None, sz=None, base=None):
     elif node in ("tx1", "tx2"):
         node_name = state[node]["deviceName"]
 
+    if node_name is None:
+        return False
+
+    if r_name.startswith("!"):
+        return node_name != r_name[1:]
     return node_name == r_name.removeprefix("+")
 
 
@@ -281,6 +303,29 @@ def send(node_addr, cmd, val):
     tx_queue.put(pkt)
 
 
+def send_time():
+    global seq
+    if not usb_dev: return
+
+    d = datetime.datetime.now()
+
+    pkt = bytearray(29)
+    pkt[0] = 0x55
+    pkt[1:3] = (0x1d, 0x04)
+    pkt[3] = crc8(pkt[:3])
+    pkt[4:6] = (0x02, 0x5a)
+    pkt[6:8] = seq.to_bytes(2, "little")
+    pkt[8:27] = (
+        0x40, 0x5b, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x33, 0x00, 0x08, 0x09,
+        d.year % 100, d.month, d.day, d.hour, d.minute, d.second, 0x00
+    )
+    pkt[27:] = crc16(pkt[:27]).to_bytes(2, "little")
+
+    seq = (seq + 1) & 0xffff
+
+    tx_queue.put(pkt)
+
+
 class Node:
     def __init__(self, node, obj):
         self.__dict__["node"] = node
@@ -328,6 +373,9 @@ ctrl = Ctrl()
 
 def apply():
     if not state or not state["rx"]["deviceName"]: return
+
+    if not cfg_queue.empty():
+        send_time()
 
     while True:
         try:

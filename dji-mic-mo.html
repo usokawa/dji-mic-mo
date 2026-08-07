@@ -231,18 +231,44 @@ input[type="range"] {
     <div><label><input name="tx.noiseCancellationStrong" type="checkbox"> Noise Cancellation: Strong</label></div>
     <div><label><input name="tx.noiseCancellationViaButton" type="checkbox"> Noise Cancellation via Button</label></div>
     <div><label><input name="tx.lowCut" type="checkbox"> Low Cut</label></div>
+    <div><label><input name="tx.clippingControl" type="checkbox"> Adaptive Gain Control: Clipping Control</label></div>
+    <div><label><input name="tx.loudnessBalance" type="checkbox"> Adaptive Gain Control: Loudness Balance</label></div>
     <div><label><input name="tx.autoOff" type="checkbox"> Auto Off</label></div>
     <div><label><input name="tx.micLedOff" type="checkbox"> Mic LED Off</label></div>
   </fieldset>
   <fieldset>
     <legend>TX1</legend>
+    <div><label><input name="tx1.rec" type="checkbox"> REC</label></div>
+    <div>
+      <label for="tx1-transmitterGain">Transmitter Gain (dB)</label>
+      <input id="tx1-transmitterGain" name="tx1.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
+      <output for="tx1-transmitterGain">0</output>
+    </div>
     <div><label><input name="tx1.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
     <div><label><input name="tx1.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+    <div><label><input name="tx1.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
+    <div><label><input name="tx1.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
+    <div><label><input name="tx1.startupAutoRecording" type="checkbox"> Startup Auto Recording</label></div>
+    <div><label><input name="tx1.loopRecording" type="checkbox"> Loop Recording</label></div>
+    <div><label><input name="tx1.recStop" type="checkbox"> REC Stop</label></div>
+    <div><label><input name="tx1.vibration" type="checkbox"> Vibration</label></div>
   </fieldset>
   <fieldset>
     <legend>TX2</legend>
+    <div><label><input name="tx2.rec" type="checkbox"> REC</label></div>
+    <div>
+      <label for="tx2-transmitterGain">Transmitter Gain (dB)</label>
+      <input id="tx2-transmitterGain" name="tx2.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
+      <output for="tx2-transmitterGain">0</output>
+    </div>
     <div><label><input name="tx2.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
     <div><label><input name="tx2.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+    <div><label><input name="tx2.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
+    <div><label><input name="tx2.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
+    <div><label><input name="tx2.startupAutoRecording" type="checkbox"> Startup Auto Recording</label></div>
+    <div><label><input name="tx2.loopRecording" type="checkbox"> Loop Recording</label></div>
+    <div><label><input name="tx2.recStop" type="checkbox"> REC Stop</label></div>
+    <div><label><input name="tx2.vibration" type="checkbox"> Vibration</label></div>
   </fieldset>
 </fieldset>
 <fieldset id="jsonGrp">
@@ -288,6 +314,7 @@ const ver = (buf, off) =>
 
 const fstr = (sz) => (buf, off) => strDec.decode(buf.subarray(off, off + sz));
 const vstr = (buf, off) => strDec.decode(buf.subarray(off, off + buf[off - 1]));
+const f16 = (buf, off) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getUint16(off, true) / 10;
 const i8 = (buf, off) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getInt8(off);
 const u8 = (buf, off) => buf[off];
 const bits = (shift, mask) => (buf, off) => (buf[off] >>> shift) & mask;
@@ -296,7 +323,7 @@ const bit = (mask) => (buf, off) => Boolean(buf[off] & mask);
 const bl1 = (val) => val === true ? 1 : val === false ? 0 : null;
 const bl2 = (val) => val === true ? 2 : val === false ? 0 : null;
 const gain = (val) => [-12, -6, 0, 6, 12].includes(val) ? val & 0xff : null;
-const mgain = (val) => Number.isInteger(val) && val >= -12 && val <= 12 ? val & 0xff : null;
+const gain1 = (val) => Number.isInteger(val) && val >= -12 && val <= 12 ? val & 0xff : null;
 
 const [T8, T16] = (() => {
   const t8 = new Uint8Array(256);
@@ -370,7 +397,7 @@ const RULES = {
     stereo:                  [0x03, 10, bit(0x04), 0x08, bl2],
     safetyTrack:             [0x03, 37, bit(0x40), 0x21, bl1],
     gainControl:             [0x03, 11, i8,        0x39, gain, '+DJI Mic Mini 2'],
-    monitoringGain:          [0x03, 16, i8,        0x26, mgain, 'DJI Mic Mini 2'],
+    monitoringGain:          [0x03, 16, i8,        0x26, gain1, 'DJI Mic Mini 2'],
     clippingControl:         [0x03, 37, bit(0x10), 0x1e, bl1],
     autoOff:                 [0x03, 10, bit(0x01), 0x10, bl1, 'DJI Mic Mini'],
     receiverOnOffWithCamera: [0x03,  9, bit(0x80), 0x20, bl1, 'DJI Mic Mini'],
@@ -381,6 +408,8 @@ const RULES = {
     noiseCancellationStrong:    [0x03,  6, bit(0x20), 0x37, bl1, '+DJI Mic Mini'],
     noiseCancellationViaButton: [0x03,  6, bit(0x80), 0x0f, bl1, 'DJI Mic Mini'],
     lowCut:                     [0x03,  9, bit(0x20), 0x03, bl1],
+    clippingControl:            [0x03,  8, bit(0x04), 0x24, bl1],
+    loudnessBalance:            [0x03, 11, bit(0x80), 0x2c, bl2],
     autoOff:                    [0x03,  6, bit(0x10), 0x10, bl1],
     micLedOff:                  [0x03,  6, bit(0x02), 0x0a, bl2],
   },
@@ -392,8 +421,18 @@ const RULES = {
     batteryLevel:            [0x03,  7, bits(2, 0x07)],
     charging:                [0x03,  7, bit(0x02)],
     inputLevel:              [0x05,  6, u8],
-    voiceToneRich:           [0x03,  9, bit(0x40), 0x29, bl1, 'DJI Mic Mini 2'],
-    voiceToneBright:         [0x03,  9, bit(0x80), 0x29, bl2, 'DJI Mic Mini 2'],
+    rec:                     [0x03,  9, bit(0x10), 0x02, bl1, 'DJI Mic Mini 2S'],
+    transmitterGain:         [0x03, 13, i8,        0x39, gain1, 'DJI Mic Mini 2S'],
+    voiceToneRich:           [0x03,  9, bit(0x40), 0x29, bl1, '!DJI Mic Mini'],
+    voiceToneBright:         [0x03,  9, bit(0x80), 0x29, bl2, '!DJI Mic Mini'],
+    recordingTimeRemaining:  [0x03, 14, f16, 'DJI Mic Mini 2S'],
+    recordingTimeTotal:      [0x03, 16, f16, 'DJI Mic Mini 2S'],
+    fileOptionEditedFile:    [0x03, 31, bit(0x80), 0x3d, bl2, 'DJI Mic Mini 2S'],
+    float32Recording:        [0x03,  9, bit(0x08), 0x0c, bl1, 'DJI Mic Mini 2S'],
+    startupAutoRecording:    [0x03,  8, bit(0x80), 0x2e, bl1, 'DJI Mic Mini 2S'],
+    loopRecording:           [0x03, 11, bit(0x08), 0x2a, bl1, 'DJI Mic Mini 2S'],
+    recStop:                 [0x03, 11, bit(0x20), 0x0b, bl1, 'DJI Mic Mini 2S'],
+    vibration:               [0x03,  9, bit(0x01), 0x04, bl1, 'DJI Mic Mini 2S'],
   },
 };
 
@@ -427,6 +466,11 @@ function valid(node, rule, write = false, typ = null, sz = null, base = null) {
     nodeName = state[node].deviceName;
   }
 
+  if (nodeName === null) { return false; }
+
+  if (rName.startsWith('!')) {
+    return nodeName !== rName.slice(1);
+  }
   return nodeName === (rName.startsWith('+') ? rName.slice(1) : rName);
 }
 
@@ -562,6 +606,32 @@ async function send(nodeAddr, cmd, val) {
   return txWorker;
 }
 
+async function sendTime() {
+  if (!usbDev) { return; }
+
+  const d = new Date();
+
+  const pkt = new Uint8Array(29);
+  const pview = new DataView(pkt.buffer);
+  pkt[0] = 0x55;
+  pkt.set([0x1d, 0x04], 1);
+  pkt[3] = crc8(pkt.subarray(0, 3));
+  pkt.set([0x02, 0x5a], 4);
+  pview.setUint16(6, seq, true);
+  pkt.set([
+    0x40, 0x5b, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x33, 0x00, 0x08, 0x09,
+    d.getFullYear() % 100, d.getMonth() + 1, d.getDate(),
+    d.getHours(), d.getMinutes(), d.getSeconds(), 0x00,
+  ], 8);
+  pview.setUint16(27, crc16(pkt.subarray(0, 27)), true);
+
+  seq = (seq + 1) & 0xffff;
+
+  txQueue.push(pkt);
+  txWorker ??= flush();
+  return txWorker;
+}
+
 const ctrl = new Proxy({}, {
   get(_, node) {
     if (!state[node]) { return state[node] ?? undefined; }
@@ -614,6 +684,10 @@ function sync() {
 
 function apply() {
   if (!state?.rx.deviceName) { return; }
+
+  if (cfgQueue.length > 0) {
+    sendTime().catch(() => {});
+  }
 
   while (cfgQueue.length > 0) {
     const cfg = cfgQueue.shift();

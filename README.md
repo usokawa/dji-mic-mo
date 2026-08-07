@@ -1,6 +1,6 @@
 # dji-mic-mo
 
-*Master your DJI Mic Mini/Mini 2 via Web or CLI.* ✨
+*Master your DJI Mic Mini/Mini 2/Mini 2S via Web or CLI.* ✨
 
 [![GitHub license](https://img.shields.io/github/license/usokawa/dji-mic-mo?style=flat)](https://github.com/usokawa/dji-mic-mo/blob/main/LICENSE.md)
 [![Language: JavaScript / Python](https://img.shields.io/badge/Language-JavaScript%20%7C%20Python-blue.svg?style=flat)](#-python-cli)
@@ -24,27 +24,37 @@ No installation required. Manage your device instantly via WebUSB!
 
 ## ⚡ Ultimate Features
 
-Unlock the absolute full potential of your DJI Mic Mini/Mini 2 with real-time controls.
+Unlock the absolute full potential of your DJI Mic Mini/Mini 2/Mini 2S with real-time controls.
+
+> **Device Tags Legend:**
+> * `[Mini RX]`: DJI Mic Mini Receiver
+> * `[Mobile RX]`: DJI Mic Series Mobile Receiver
+> * `[Mini 2 / 2S]`: DJI Mic Mini 2 / Mini 2S Transmitter
+> * `[Mini 2S]`: DJI Mic Mini 2S Transmitter
+>
+> *(Features without tags are supported across all applicable devices)*
 
 ### 🎧 RX
 * **Audio Channel:** Choose Mono, Stereo, or Safety Track.
-* **Gain:** Adjust Gain (-12dB to +12dB, 6dB steps) and Monitoring Gain (1dB steps).
-* **Config:** Toggle Clipping Control, Auto Off, Receiver On/Off With Camera, and Plug-Free External Speaker.
+* **Gain:** Adjust Gain (-12dB to +12dB, 6dB steps) `[Mobile RX]` and Monitoring Gain `[Mobile RX]`.
+* **Config:** Toggle Clipping Control, Auto Off `[Mini RX]`, Receiver On/Off With Camera `[Mini RX]`, and Plug-Free External Speaker.
 
 ### 🎤 TX
-* **Audio Processing:** Apply Voice Tone (Regular, Rich, Bright) and activate Low Cut.
-* **Noise Cancellation:** Choose Off, Basic, or Strong, or control via button.
-* **Config:** Toggle Auto Off and Mic LED Off.
+* **Audio & NC:** Activate Low Cut, and choose Noise Cancellation mode (Off, Basic, Strong, or via button). Apply Voice Tone (Regular, Rich, Bright) `[Mini 2 / 2S]`, and control Transmitter Gain (1dB steps) `[Mini 2S]`.
+* **Gain Control:** Toggle Adaptive Gain Control settings: Clipping Control, and Loudness Balance `[Mini 2S]`.
+* **Internal Recording `[Mini 2S]`:** Start/Stop local recording, enable 32-bit Float Recording, Startup Auto Recording, Loop Recording, and configure File Options.
+* **System & Config:** Toggle Auto Off, Mic LED Off, and Vibration `[Mini 2S]`.
 
 ### 📊 Live Telemetry
-* **Monitoring:** Track battery levels(1:Full, 7:Empty), charging status, and device info in real-time.
+* **Monitoring:** Track battery levels (1:Full, 7:Empty) and charging status *(Excludes Mobile RX)*, plus real-time device info.
+* **Recording Status `[Mini 2S]`:** Monitor Total and Remaining Recording Time dynamically.
 
 ## 💻 Compatibility
 
 * **Devices:**
   * RX: DJI Mic Mini, DJI Mic Series Mobile Receiver
-  * TX: DJI Mic Mini, DJI Mic Mini 2
-* **Firmware:** V02
+  * TX: DJI Mic Mini, DJI Mic Mini 2, DJI Mic Mini 2S
+* **Firmware:** V02 (Mini / Mini 2), V30 (Mini 2S)
 * **Browsers:** Chrome, Edge, Opera (or Chromium-based)
   *(Note: iOS / Safari / Firefox are not supported due to lack of WebUSB support.)*
 * **OS:** Linux, ChromeOS, macOS, Android, Windows (*See USB Setup below*)
@@ -93,15 +103,24 @@ pip install pyusb
 ### Usage
 
 * **Monitor Live State**
+
   Stream real-time status straight to your stdout:
   ```bash
   python3 dji-mic-mo.py
   ```
 
 * **Apply Config**
-  Pipe JSON config. *(Allow ~3 seconds for the program to initialize before sending commands.)*
+
+  Pipe JSON config to `stdin`. *(Allow ~3 seconds for the program to initialize before sending commands.)*
+
+  *Example: Set RX to Stereo*
   ```bash
   (sleep 3; echo '{"rx":{"stereo":true}}') | python3 dji-mic-mo.py
+  ```
+
+  *Example: Start recording on TX1*
+  ```bash
+  (sleep 3; echo '{"tx1":{"rec":true}}') | python3 dji-mic-mo.py
   ```
 
 ## 📜 License
