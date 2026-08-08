@@ -169,7 +169,11 @@ summary:hover {
   > details:has(input) > div {
     align-items: flex-start;
 
-    > div:has(input:disabled) {
+    > details {
+      align-self: stretch;
+    }
+
+    > *:has(input:disabled) {
       display: none;
     }
   }
@@ -260,6 +264,12 @@ summary:hover {
   <details>
     <summary>TX1</summary>
     <div>
+      <details>
+        <summary>Format</summary>
+        <div>
+          <div><label><input name="tx1.recordingTimeRemaining" type="checkbox"> CLICKING HERE WILL DELETE ALL DATA WITHOUT CONFIRMATION!</label></div>
+        </div>
+      </details>
       <div><label><input name="tx1.rec" type="checkbox"> REC</label></div>
       <div>
         <label for="tx1-transmitterGain">Transmitter Gain (dB)</label>
@@ -282,6 +292,12 @@ summary:hover {
   <details>
     <summary>TX2</summary>
     <div>
+      <details>
+        <summary>Format</summary>
+        <div>
+          <div><label><input name="tx2.recordingTimeRemaining" type="checkbox"> CLICKING HERE WILL DELETE ALL DATA WITHOUT CONFIRMATION!</label></div>
+        </div>
+      </details>
       <div><label><input name="tx2.rec" type="checkbox"> REC</label></div>
       <div>
         <label for="tx2-transmitterGain">Transmitter Gain (dB)</label>
@@ -304,6 +320,12 @@ summary:hover {
   <details>
     <summary>TX3</summary>
     <div>
+      <details>
+        <summary>Format</summary>
+        <div>
+          <div><label><input name="tx3.recordingTimeRemaining" type="checkbox"> CLICKING HERE WILL DELETE ALL DATA WITHOUT CONFIRMATION!</label></div>
+        </div>
+      </details>
       <div><label><input name="tx3.rec" type="checkbox"> REC</label></div>
       <div>
         <label for="tx3-transmitterGain">Transmitter Gain (dB)</label>
@@ -326,6 +348,12 @@ summary:hover {
   <details>
     <summary>TX4</summary>
     <div>
+      <details>
+        <summary>Format</summary>
+        <div>
+          <div><label><input name="tx4.recordingTimeRemaining" type="checkbox"> CLICKING HERE WILL DELETE ALL DATA WITHOUT CONFIRMATION!</label></div>
+        </div>
+      </details>
       <div><label><input name="tx4.rec" type="checkbox"> REC</label></div>
       <div>
         <label for="tx4-transmitterGain">Transmitter Gain (dB)</label>
@@ -500,12 +528,12 @@ const RULES = {
     batteryLevel:              [0x03,  7, bits(2, 0x07)],
     charging:                  [0x03,  7, bit(0x02)],
     inputLevel:                [0x05,  6, u8],
+    recordingTimeTotal:        [0x03, 14, f16, 'DJI Mic Mini 2S'],
+    recordingTimeRemaining:    [0x03, 16, f16,       0x07, bl1, 'DJI Mic Mini 2S'],
     rec:                       [0x03,  9, bit(0x10), 0x02, bl1, 'DJI Mic Mini 2S'],
     transmitterGain:           [0x03, 13, i8,        0x39, gain1, 'DJI Mic Mini 2S'],
     voiceToneRich:             [0x03,  9, bit(0x40), 0x29, bl1, '!DJI Mic Mini'],
     voiceToneBright:           [0x03,  9, bit(0x80), 0x29, bl2, '!DJI Mic Mini'],
-    recordingTimeRemaining:    [0x03, 14, f16, 'DJI Mic Mini 2S'],
-    recordingTimeTotal:        [0x03, 16, f16, 'DJI Mic Mini 2S'],
     fileOptionEditedFile:      [0x03, 31, bit(0x80), 0x3d, bl2, 'DJI Mic Mini 2S'],
     float32Recording:          [0x03,  9, bit(0x08), 0x0c, bl1, 'DJI Mic Mini 2S'],
     startupAutoRecording1:     [0x03,  8, bit(0x80), 0x2e, bl1, 'DJI Mic Mini 2S'], // Mobile / Mini RX

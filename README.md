@@ -42,8 +42,10 @@ Unlock the absolute full potential of your DJI Mic Mini/Mini 2/Mini 2S with real
 ### 🎤 TX
 * **Audio & NC:** Activate Low Cut, and choose Noise Cancellation mode (Off, Basic, Strong, or via button). Apply Voice Tone (Regular, Rich, Bright) `[Mini 2 / 2S]`, and control Transmitter Gain (1dB steps) `[Mini 2S]`.
 * **Gain Control:** Toggle Adaptive Gain Control settings: Clipping Control, and Loudness Balance `[Mini 2S]`.
-* **Internal Recording `[Mini 2S]`:** Start/Stop local recording, enable 32-bit Float Recording, Auto Recording modes (Startup, With Receiver, Low Power), Loop Recording, and configure File Options.
+* **Internal Recording `[Mini 2S]`:** Start/Stop local recording, enable 32-bit Float Recording, Auto Recording modes (Startup, With Receiver, Low Power), Loop Recording, configure File Options, **and Format (Delete all data)**.
 * **System & Config:** Toggle Auto Off, Mic LED Off, and Vibration `[Mini 2S]`.
+
+> **⚠️ Caution:** The Format feature will instantly delete all internal recordings on the TX. Please handle with care.
 
 ### 📊 Live Telemetry
 * **Monitoring:** Track battery levels (1:Full, 7:Empty) and charging status `[Mini / 2S RX]`, plus real-time device info.
