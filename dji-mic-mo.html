@@ -427,6 +427,7 @@ const bit = (mask) => (buf, off) => Boolean(buf[off] & mask);
 
 const bl1 = (val) => val === true ? 1 : val === false ? 0 : null;
 const bl2 = (val) => val === true ? 2 : val === false ? 0 : null;
+const bl21 = (val) => val === true ? 2 : val === false ? 1 : null;
 const bl4 = (val) => val === true ? 4 : val === false ? 0 : null;
 const gain = (val) => [-12, -6, 0, 6, 12].includes(val) ? val & 0xff : null;
 const gain1 = (val) => Number.isInteger(val) && val >= -12 && val <= 12 ? val & 0xff : null;
@@ -516,7 +517,7 @@ const RULES = {
     noiseCancellationViaButton: [0x03,  6, bit(0x80), 0x0f, bl1, '!DJI Mic Mini 2'],
     lowCut:                     [0x03,  9, bit(0x20), 0x03, bl1],
     clippingControl:            [0x03,  8, bit(0x04), 0x24, bl1],
-    loudnessBalance:            [0x03, 11, bit(0x80), 0x2c, bl2],
+    loudnessBalance:            [0x03, 11, bit(0x80), 0x2c, bl21],
     autoOff:                    [0x03,  6, bit(0x10), 0x10, bl1],
     micLedOff:                  [0x03,  6, bit(0x02), 0x0a, bl2],
   },

@@ -58,6 +58,10 @@ def bl2(val):
     return 2 if val is True else 0 if val is False else None
 
 
+def bl21(val):
+    return 2 if val is True else 1 if val is False else None
+
+
 def bl4(val):
     return 4 if val is True else 0 if val is False else None
 
@@ -152,7 +156,7 @@ RULES = {
         "noiseCancellationViaButton": (0x03,  6, bit(0x80), 0x0f, bl1, "!DJI Mic Mini 2"),
         "lowCut":                     (0x03,  9, bit(0x20), 0x03, bl1),
         "clippingControl":            (0x03,  8, bit(0x04), 0x24, bl1),
-        "loudnessBalance":            (0x03, 11, bit(0x80), 0x2c, bl2),
+        "loudnessBalance":            (0x03, 11, bit(0x80), 0x2c, bl21),
         "autoOff":                    (0x03,  6, bit(0x10), 0x10, bl1),
         "micLedOff":                  (0x03,  6, bit(0x02), 0x0a, bl2),
     },
