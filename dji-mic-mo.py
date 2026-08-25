@@ -18,8 +18,8 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 IS_TTY = sys.stdout.isatty()
 
 
-def ver(buf, off):
-    return ".".join(f"{b:02d}" for b in reversed(buf[off : off + 4]))
+def ver(rev):
+    return lambda buf, off: ".".join(f"{b:02d}" for b in (reversed(buf[off : off + 4]) if rev else buf[off : off + 4]))
 
 
 def fstr(sz):
@@ -134,10 +134,10 @@ ADDR = {"rx": 0x00, "tx1": 0x01, "tx2": 0x02, "tx3": 0x04, "tx4": 0x08, "tx": 0x
 
 RULES = {
     "rx": {
-        "firmwareVersion":         (0x01,  9, ver),
-        "serialNumber":            (0x01, 13, fstr(14)),
-        "addressSuffix":           (0x01, 33, fstr(6)),
         "deviceName":              (0x01, 45, vstr),
+        "addressSuffix":           (0x01, 33, fstr(6)),
+        "serialNumber":            (0x01, 13, fstr(14)),
+        "firmwareVersion":         (0x01,  9, ver(True)),
         "batteryLevel":            (0x03, 10, bits(5, 0x07), "!DJI Mic Mini 2"),
         "charging":                (0x03, 10, bit(0x10), "!DJI Mic Mini 2"),
         "stereo":                  (0x03, 10, bit(0x04), 0x08, bl2),
@@ -161,10 +161,10 @@ RULES = {
         "micLedOff":                  (0x03,  6, bit(0x02), 0x0a, bl2),
     },
     "txi": {
-        "firmwareVersion":           (0x01,  6, ver),
-        "serialNumber":              (0x01, 10, fstr(14)),
-        "addressSuffix":             (0x01, 30, fstr(6)),
         "deviceName":                (0x01, 42, vstr),
+        "addressSuffix":             (0x01, 30, fstr(6)),
+        "serialNumber":              (0x01, 10, fstr(14)),
+        "firmwareVersion":           (0x01,  6, ver(True)),
         "batteryLevel":              (0x03,  7, bits(2, 0x07)),
         "charging":                  (0x03,  7, bit(0x02)),
         "inputLevel":                (0x05,  6, u8),
@@ -179,7 +179,7 @@ RULES = {
         "startupAutoRecording1":     (0x03,  8, bit(0x80), 0x2e, bl1, "DJI Mic Mini 2S"), # Mobile / Mini RX
         "startupAutoRecording2s":    (0x03, 31, bit(0x10), 0x3e, bl1, "DJI Mic Mini 2S"), # Mini 2S RX
         "autoRecordingWithReceiver": (0x03, 31, bit(0x20), 0x3e, bl2, "DJI Mic Mini 2S"), # Mini 2S RX
-        "lowPowerAutoRecording"    : (0x03, 11, bit(0x10), 0x2b, bl1, "DJI Mic Mini 2S"), # Mini 2S RX
+        "lowPowerAutoRecording":     (0x03, 11, bit(0x10), 0x2b, bl1, "DJI Mic Mini 2S"), # Mini 2S RX
         "loopRecording":             (0x03, 11, bit(0x08), 0x2a, bl1, "DJI Mic Mini 2S"),
         "recStop":                   (0x03, 11, bit(0x20), 0x0b, bl1, "DJI Mic Mini 2S"),
         "vibration":                 (0x03,  9, bit(0x01), 0x04, bl1, "DJI Mic Mini 2S"),
@@ -223,7 +223,7 @@ def valid(node, rule, write=False, typ=None, sz=None, base=None):
 
     if r_name.startswith("!") or r_name.startswith("-"):
         return node_name != r_name[1:]
-    return node_name == r_name.removeprefix("+")
+    return node_name == (r_name[1:] if r_name.startswith("+") else r_name)
 
 
 def scan(data):
@@ -567,6 +567,8 @@ def main():
     finally:
         state = None
         seq = 0
+        cfg_queue.queue.clear()
+        tx_queue.queue.clear()
         aborted.clear()
 
         if usb_dev:

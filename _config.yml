@@ -1,4 +1,4 @@
 title: dji-mic-mo
-description: Master your DJI Mic Mini/Mini 2/Mini 2S via Web or CLI.
+description: Open-source browser and CLI control for your DJI Mic Mini series.
 repository: usokawa/dji-mic-mo
 theme: jekyll-theme-slate

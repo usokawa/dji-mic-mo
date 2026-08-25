@@ -218,7 +218,7 @@ summary:hover {
 </head>
 <body>
 <fieldset id="connGrp">
-  <legend>Connection</legend>
+  <legend>Connection (USB)</legend>
   <div>
     <button id="connBtn" type="button">Connect</button>
     <div><label><input id="debugChk" type="checkbox"> Debug</label></div>
@@ -411,11 +411,13 @@ const concat = (a, b) => {
 const strDec = new TextDecoder();
 const numFmt = new Intl.NumberFormat('en-US', { signDisplay: 'exceptZero' });
 
-const ver = (buf, off) =>
-  [...buf.subarray(off, off + 4)]
-    .reverse()
-    .map((b) => b.toString().padStart(2, '0'))
-    .join('.');
+const ver = (rev) => (buf, off) => {
+  const arr = [...buf.subarray(off, off + 4)];
+  if (rev) {
+    arr.reverse();
+  }
+  return arr.map((b) => b.toString().padStart(2, '0')).join('.');
+};
 
 const fstr = (sz) => (buf, off) => strDec.decode(buf.subarray(off, off + sz));
 const vstr = (buf, off) => strDec.decode(buf.subarray(off, off + buf[off - 1]));
@@ -495,10 +497,10 @@ const ADDR = { rx: 0x00, tx1: 0x01, tx2: 0x02, tx3: 0x04, tx4: 0x08, tx: 0xffff 
 
 const RULES = {
   rx: {
-    firmwareVersion:         [0x01,  9, ver],
-    serialNumber:            [0x01, 13, fstr(14)],
-    addressSuffix:           [0x01, 33, fstr(6)],
     deviceName:              [0x01, 45, vstr],
+    addressSuffix:           [0x01, 33, fstr(6)],
+    serialNumber:            [0x01, 13, fstr(14)],
+    firmwareVersion:         [0x01,  9, ver(true)],
     batteryLevel:            [0x03, 10, bits(5, 0x07), '!DJI Mic Mini 2'],
     charging:                [0x03, 10, bit(0x10), '!DJI Mic Mini 2'],
     stereo:                  [0x03, 10, bit(0x04), 0x08, bl2],
@@ -522,10 +524,10 @@ const RULES = {
     micLedOff:                  [0x03,  6, bit(0x02), 0x0a, bl2],
   },
   txi: {
-    firmwareVersion:           [0x01,  6, ver],
-    serialNumber:              [0x01, 10, fstr(14)],
-    addressSuffix:             [0x01, 30, fstr(6)],
     deviceName:                [0x01, 42, vstr],
+    addressSuffix:             [0x01, 30, fstr(6)],
+    serialNumber:              [0x01, 10, fstr(14)],
+    firmwareVersion:           [0x01,  6, ver(true)],
     batteryLevel:              [0x03,  7, bits(2, 0x07)],
     charging:                  [0x03,  7, bit(0x02)],
     inputLevel:                [0x05,  6, u8],
@@ -950,6 +952,7 @@ async function main() {
     state = null;
     seq = 0;
 
+    cfgQueue.length = 0;
     txQueue.length = 0;
     if (txWorker) {
       try { await txWorker; } catch {}
@@ -960,8 +963,6 @@ async function main() {
       try { await usbDev.close(); } catch {}
     }
     usbDev = null;
-
-    cfgQueue.length = 0;
   }
 }
 

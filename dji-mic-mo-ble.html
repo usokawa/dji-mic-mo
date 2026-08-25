@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dji-mic-mo-ble</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --motion: 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+button, input, textarea {
+  font: inherit;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.5rem;
+  font-family: system-ui, sans-serif;
+  color: CanvasText;
+  background-color: Canvas;
+}
+
+fieldset, details {
+  padding: 0.5rem;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.5rem;
+
+  > legend {
+    padding: 0;
+  }
+}
+
+details {
+  > summary {
+    border-radius: 0.25rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  > div {
+    padding-block-start: 0.5rem;
+  }
+}
+
+fieldset, details > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+
+  > div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+}
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+:is(textarea, pre) {
+  inline-size: 100%;
+  margin: 0;
+  padding: 0.5rem;
+  font-family: ui-monospace, monospace;
+  font-size: 1rem;
+  color: CanvasText;
+  background-color: Canvas;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.25rem;
+}
+
+textarea {
+  display: block;
+  field-sizing: content;
+  resize: none;
+}
+
+pre {
+  overflow-inline: auto;
+}
+
+:is(button, summary, input[type="checkbox"]) {
+  transition: opacity var(--motion);
+}
+
+button {
+  padding-block: 0.25rem;
+  padding-inline: 0.5rem;
+  color: ButtonText;
+  background-color: ButtonFace;
+  border: 1px solid ButtonBorder;
+  border-radius: 0.25rem;
+}
+
+input[type="checkbox"] {
+  position: relative;
+  box-sizing: content-box;
+  flex-shrink: 0;
+  inline-size: 2em;
+  block-size: 1em;
+  appearance: none;
+  background-color: ButtonBorder;
+  border: 1px solid transparent;
+  border-radius: 1em;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block-start: 0.1em;
+    inset-inline-start: 0.1em;
+    inline-size: 0.8em;
+    block-size: 0.8em;
+    background-color: Canvas;
+    border-radius: 50%;
+    transition: inset-inline-start var(--motion);
+  }
+
+  &:checked {
+    background-color: LinkText;
+
+    &::before {
+      inset-inline-start: 1.1em;
+    }
+  }
+}
+
+input[type="range"] {
+  accent-color: LinkText;
+}
+
+:is(button, input, summary, textarea):focus-visible {
+  outline: 2px solid LinkText;
+  outline-offset: 2px;
+}
+
+textarea:focus-visible {
+  outline-offset: -1px;
+}
+
+:is(button, input):not(:disabled):hover,
+summary:hover {
+  opacity: 0.5;
+}
+
+:is(button, input, textarea):disabled {
+  color: GrayText;
+  background-color: ButtonFace;
+  border-color: GrayText;
+  cursor: not-allowed;
+}
+
+#cfgGrp {
+  > details:not(:has(:is(input, textarea):enabled)) {
+    display: none;
+  }
+
+  > details:has(input) > div {
+    align-items: flex-start;
+
+    > details {
+      align-self: stretch;
+    }
+
+    > *:has(input:disabled) {
+      display: none;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  input[type="checkbox"] {
+    background-color: Canvas;
+    border-color: CanvasText;
+    forced-color-adjust: none;
+
+    &::before {
+      background-color: CanvasText;
+      forced-color-adjust: none;
+    }
+
+    &:checked {
+      background-color: Highlight;
+      border-color: Highlight;
+
+      &::before {
+        background-color: HighlightText;
+      }
+    }
+  }
+
+  input[type="range"] {
+    accent-color: Highlight;
+  }
+
+  :is(button, input, summary, textarea):focus-visible {
+    outline-color: Highlight;
+  }
+}
+</style>
+</head>
+<body>
+<fieldset id="connGrp">
+  <legend>Connection (BLE)</legend>
+  <div>
+    <button id="connBtn" type="button">Connect</button>
+    <div><label><input id="debugChk" type="checkbox"> Debug</label></div>
+  </div>
+</fieldset>
+<fieldset id="cfgGrp">
+  <legend>Config</legend>
+  <details>
+    <summary>TX</summary>
+    <div>
+      <details>
+        <summary>Format</summary>
+        <div>
+          <div><label><input name="tx.recordingTimeRemaining" type="checkbox"> CLICKING HERE WILL DELETE ALL DATA WITHOUT CONFIRMATION!</label></div>
+        </div>
+      </details>
+      <div><label><input name="tx.rec" type="checkbox"> REC</label></div>
+      <div>
+        <label for="tx-transmitterGain">Transmitter Gain (dB)</label>
+        <input id="tx-transmitterGain" name="tx.transmitterGain" type="range" min="-12" max="12" step="1" value="0">
+        <output for="tx-transmitterGain">0</output>
+      </div>
+      <div><label><input name="tx.voiceToneRich" type="checkbox"> Voice Tone: Rich</label></div>
+      <div><label><input name="tx.voiceToneBright" type="checkbox"> Voice Tone: Bright</label></div>
+      <div><label><input name="tx.fileOptionEditedFile" type="checkbox"> File Option: Edited File</label></div>
+      <div><label><input name="tx.float32Recording" type="checkbox"> 32-bit Float Recording</label></div>
+      <div><label><input name="tx.startupAutoRecording2s" type="checkbox"> Startup Auto Recording</label></div>
+      <div><label><input name="tx.autoRecordingWithReceiver" type="checkbox"> Auto Recording With Receiver</label></div>
+      <div><label><input name="tx.lowPowerAutoRecording" type="checkbox"> Low Power Auto Recording</label></div>
+      <div><label><input name="tx.loopRecording" type="checkbox"> Loop Recording</label></div>
+      <div><label><input name="tx.recStop" type="checkbox"> REC Stop</label></div>
+      <div><label><input name="tx.vibration" type="checkbox"> Vibration</label></div>
+      <div><label><input name="tx.noiseCancellation" type="checkbox"> Noise Cancellation</label></div>
+      <div><label><input name="tx.noiseCancellationStrong" type="checkbox"> Noise Cancellation: Strong</label></div>
+      <div><label><input name="tx.noiseCancellationViaButton" type="checkbox"> Noise Cancellation via Button</label></div>
+      <div><label><input name="tx.lowCut" type="checkbox"> Low Cut</label></div>
+      <div><label><input name="tx.clippingControl" type="checkbox"> Adaptive Gain Control: Clipping Control</label></div>
+      <div><label><input name="tx.loudnessBalance" type="checkbox"> Adaptive Gain Control: Loudness Balance</label></div>
+      <div><label><input name="tx.autoOff" type="checkbox"> Auto Off</label></div>
+      <div><label><input name="tx.micLedOff" type="checkbox"> Mic LED Off</label></div>
+    </div>
+  </details>
+  <details>
+    <summary>JSON</summary>
+    <div>
+      <div><textarea id="cfgTxt" autocapitalize="none" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></div>
+      <div><button id="applyBtn" type="button">Apply</button></div>
+    </div>
+  </details>
+</fieldset>
+<fieldset id="stateGrp">
+  <legend>State</legend>
+  <pre id="stateTxt"></pre>
+</fieldset>
+
+<script type="module">
+const connBtn = document.getElementById('connBtn');
+const debugChk = document.getElementById('debugChk');
+const cfgGrp = document.getElementById('cfgGrp');
+const cfgInputs = cfgGrp.querySelectorAll('input');
+const applyBtn = document.getElementById('applyBtn');
+const cfgTxt = document.getElementById('cfgTxt');
+const stateTxt = document.getElementById('stateTxt');
+
+const isObj = (v) => v?.constructor === Object;
+const hex = (v, len = 2) => v.toString(16).padStart(len, '0');
+
+const concat = (a, b) => {
+  if (a.length === 0) { return b; }
+  if (b.length === 0) { return a; }
+
+  const c = new Uint8Array(a.length + b.length);
+  c.set(a);
+  c.set(b, a.length);
+  return c;
+};
+
+const strDec = new TextDecoder();
+const numFmt = new Intl.NumberFormat('en-US', { signDisplay: 'exceptZero' });
+
+const ver = (rev) => (buf, off) => {
+  const arr = [...buf.subarray(off, off + 4)];
+  if (rev) {
+    arr.reverse();
+  }
+  return arr.map((b) => b.toString().padStart(2, '0')).join('.');
+};
+
+const fstr = (sz) => (buf, off) => strDec.decode(buf.subarray(off, off + sz));
+const vstr = (buf, off) => strDec.decode(buf.subarray(off, off + buf[off - 1]));
+const f16 = (buf, off) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getUint16(off, true) / 10;
+const i8 = (buf, off) => new DataView(buf.buffer, buf.byteOffset, buf.byteLength).getInt8(off);
+const u8 = (buf, off) => buf[off];
+const bits = (shift, mask) => (buf, off) => (buf[off] >>> shift) & mask;
+const bit = (mask) => (buf, off) => Boolean(buf[off] & mask);
+
+const bl1 = (val) => val === true ? 1 : val === false ? 0 : null;
+const bl2 = (val) => val === true ? 2 : val === false ? 0 : null;
+const bl21 = (val) => val === true ? 2 : val === false ? 1 : null;
+const bl4 = (val) => val === true ? 4 : val === false ? 0 : null;
+const gain = (val) => [-12, -6, 0, 6, 12].includes(val) ? val & 0xff : null;
+const gain1 = (val) => Number.isInteger(val) && val >= -12 && val <= 12 ? val & 0xff : null;
+
+const [T8, T16] = (() => {
+  const t8 = new Uint8Array(256);
+  const t16 = new Uint16Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    let k = i;
+    for (let j = 0; j < 8; j++) {
+      c = (c >>> 1) ^ (-(c & 1) & 0x8c);
+      k = (k >>> 1) ^ (-(k & 1) & 0x8408);
+    }
+    t8[i] = c;
+    t16[i] = k;
+  }
+  return [t8, t16];
+})();
+
+function crc8(buf) {
+  let c = 0x77;
+  for (const b of buf) {
+    c = T8[c ^ b];
+  }
+  return c;
+}
+
+function crc16(buf) {
+  let c = 0x3692;
+  for (const b of buf) {
+    c = (c >>> 8) ^ T16[(c ^ b) & 0xff];
+  }
+  return c;
+}
+
+function dump(pkt) {
+  const pview = new DataView(pkt.buffer, pkt.byteOffset, pkt.byteLength);
+  const hdr = pview.getUint16(1, true);
+  const pktVer = (hdr >>> 10) & 0x3f;
+  const pktLen = hdr & 0x3ff;
+  const pktSeq = pview.getUint16(6, true);
+  const data = pkt.subarray(11, -2);
+
+  const lines = [
+    `Ver: ${pktVer} Len: ${pktLen}(${data.length}) ` +
+    `Src: ${hex(pkt[4])} Dst: ${hex(pkt[5])} ` +
+    `Seq: ${hex(pktSeq, 4)} Type: ${hex(pkt[8])} ` +
+    `Set: ${hex(pkt[9])} ID: ${hex(pkt[10])}`,
+  ];
+
+  for (let i = 0; i < data.length; i += 16) {
+    const chunk = [...data.subarray(i, i + 16)];
+    const left = chunk.slice(0, 8).map((b) => hex(b)).join(' ');
+    const right = chunk.slice(8).map((b) => hex(b)).join(' ');
+    const hexStr = right ? `${left}  ${right}` : left;
+    const asciiStr = chunk.map((b) => (32 <= b && b <= 126) ? String.fromCharCode(b) : '.').join('');
+    lines.push(`${hex(i, 4)}  ${hexStr.padEnd(48, ' ')}  |${asciiStr}|`);
+  }
+
+  return lines.join('\n');
+}
+
+const RULES = {
+  tx: {
+    serialNumber:               [0x01, 12, vstr],
+    firmwareVersion:            [0x01,  7, ver(false)],
+    charging:                   [0x01,  4, bit(0x02)],
+    noiseCancellationViaButton: [0x01,  3, bit(0x80), 0x0f, bl1],
+    autoOff:                    [0x01,  3, bit(0x10), 0x10, bl1],
+    micLedOff:                  [0x01,  6, bit(0x80), 0x0a, bl2],
+  }
+};
+
+const RULES_MINI_2S = {
+  tx: {
+    serialNumber:               [0x01, 13, fstr(14)],
+    firmwareVersion:            [0x01,  9, ver(true)],
+    charging:                   [0x02, 10, bit(0x02)],
+    recordingTimeTotal:         [0x02, 17, f16],
+    recordingTimeRemaining:     [0x02, 19, f16,       0x07, bl1],
+    rec:                        [0x02, 12, bit(0x10), 0x02, bl1],
+    transmitterGain:            [0x02, 16, i8,        0x39, gain1],
+    voiceToneRich:              [0x02, 12, bit(0x40), 0x29, bl1],
+    voiceToneBright:            [0x02, 12, bit(0x80), 0x29, bl2],
+    fileOptionEditedFile:       [0x02, 34, bit(0x80), 0x3d, bl2],
+    float32Recording:           [0x02, 12, bit(0x08), 0x0c, bl1],
+    startupAutoRecording2s:     [0x02, 34, bit(0x10), 0x3e, bl1],
+    autoRecordingWithReceiver:  [0x02, 34, bit(0x20), 0x3e, bl2],
+    lowPowerAutoRecording:      [0x02, 14, bit(0x10), 0x2b, bl1],
+    loopRecording:              [0x02, 14, bit(0x08), 0x2a, bl1],
+    recStop:                    [0x02, 14, bit(0x20), 0x0b, bl1],
+    vibration:                  [0x02, 12, bit(0x01), 0x04, bl1],
+    noiseCancellation:          [0x02, 10, bit(0x01), 0x0e, bl1],
+    noiseCancellationStrong:    [0x02,  9, bit(0x20), 0x1d, bl1],
+    noiseCancellationViaButton: [0x02,  9, bit(0x80), 0x0f, bl1],
+    lowCut:                     [0x02, 12, bit(0x20), 0x03, bl1],
+    clippingControl:            [0x02, 11, bit(0x04), 0x24, bl1],
+    loudnessBalance:            [0x02, 14, bit(0x80), 0x2c, bl21],
+    autoOff:                    [0x02,  9, bit(0x10), 0x10, bl1],
+    micLedOff:                  [0x02,  9, bit(0x02), 0x0a, bl2],
+  }
+};
+
+let activeRules = RULES;
+
+let btDev = null;
+let btCharWrite = null;
+let btCharNotify = null;
+let state = null;
+let seq = 0;
+let debug = false;
+let isMini2S = false;
+const cfgQueue = [];
+const txQueue = [];
+let txWorker = null;
+
+const rxQueue = [];
+let rxResolve = null;
+let rxReject = null;
+
+function onCharChanged(e) {
+  rxQueue.push(new Uint8Array(e.target.value.buffer));
+  if (rxResolve) { rxResolve(); rxResolve = null; rxReject = null; }
+}
+
+function onDisconnect() {
+  const err = new Error("Device disconnected");
+  rxQueue.push(err);
+  if (rxReject) {
+    rxReject(err);
+    rxResolve = null;
+    rxReject = null;
+  }
+}
+
+function valid(rule, write = false, typ = null, sz = null, base = null) {
+  if (write) {
+    if (rule.length < 5) { return false; }
+  } else {
+    if (rule[0] !== typ || base + rule[1] >= sz) { return false; }
+  }
+
+  return true;
+}
+
+function scan(data) {
+  if (data.length < 4) { return { typ: null, base: null }; }
+
+  const typ = isMini2S ? data[3] : data[0];
+
+  return { typ, base: 0 };
+}
+
+function read(node, data, typ, base, obj) {
+  for (const [key, rule] of Object.entries(activeRules[node])) {
+    if (!valid(rule, false, typ, data.length, base)) { continue; }
+    obj[key] = rule[2](data, base + rule[1]);
+  }
+}
+
+function init(node) {
+  return Object.fromEntries(Object.keys(activeRules[node]).map((key) => [key, null]));
+}
+
+function parse(pkt) {
+  if (pkt[9] !== 0x5b || pkt[10] !== 0x03) { return; }
+
+  const data = pkt.subarray(11, -2);
+  const blk = scan(data);
+
+  if (blk.typ !== null && blk.base !== null) {
+    read('tx', data, blk.typ, blk.base, state.tx);
+  }
+}
+
+async function flush() {
+  while (txQueue.length > 0) {
+    if (!btDev?.gatt?.connected) {
+      txQueue.length = 0;
+      break;
+    }
+    const pkt = txQueue.shift();
+    try {
+      await btCharWrite.writeValueWithoutResponse(pkt);
+      if (debug) {
+        console.log(`${dump(pkt)}\n`);
+      }
+      if (txQueue.length > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    } catch {}
+  }
+  txWorker = null;
+}
+
+async function sendOld(cmd, val) {
+  if (!btDev) { return; }
+
+  const pkt = new Uint8Array(19);
+  const pview = new DataView(pkt.buffer);
+  pkt[0] = 0x55;
+  pkt.set([0x13, 0x04], 1);
+  pkt[3] = crc8(pkt.subarray(0, 3));
+  pkt.set([0x02, 0x3a], 4);
+  pview.setUint16(6, seq, true);
+  pkt.set([
+    0x40, 0x5b, 0x01, 0x00, 0x00,
+    cmd, 0x00, 0x01, val,
+  ], 8);
+  pview.setUint16(17, crc16(pkt.subarray(0, 17)), true);
+
+  seq = (seq + 1) & 0xffff;
+
+  txQueue.push(pkt);
+  txWorker ??= flush();
+  return txWorker;
+}
+
+async function send(cmd, val) {
+  if (!btDev) { return; }
+
+  const pkt = new Uint8Array(22);
+  const pview = new DataView(pkt.buffer);
+  pkt[0] = 0x55;
+  pkt.set([0x16, 0x04], 1);
+  pkt[3] = crc8(pkt.subarray(0, 3));
+  pkt.set([0x02, 0x3a], 4);
+  pview.setUint16(6, seq, true);
+  pkt.set([
+    0x40, 0x5b, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00,
+    cmd, 0x00, 0x01, val,
+  ], 8);
+  pview.setUint16(20, crc16(pkt.subarray(0, 20)), true);
+
+  seq = (seq + 1) & 0xffff;
+
+  txQueue.push(pkt);
+  txWorker ??= flush();
+  return txWorker;
+}
+
+async function sendTime() {
+  if (!btDev) { return; }
+
+  const d = new Date();
+
+  const pkt = new Uint8Array(29);
+  const pview = new DataView(pkt.buffer);
+  pkt[0] = 0x55;
+  pkt.set([0x1d, 0x04], 1);
+  pkt[3] = crc8(pkt.subarray(0, 3));
+  pkt.set([0x02, 0x3a], 4);
+  pview.setUint16(6, seq, true);
+  pkt.set([
+    0x40, 0x5b, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x33, 0x00, 0x08, 0x09,
+    d.getFullYear() % 100, d.getMonth() + 1, d.getDate(),
+    d.getHours(), d.getMinutes(), d.getSeconds(), 0x00,
+  ], 8);
+  pview.setUint16(27, crc16(pkt.subarray(0, 27)), true);
+
+  seq = (seq + 1) & 0xffff;
+
+  txQueue.push(pkt);
+  txWorker ??= flush();
+  return txWorker;
+}
+
+const ctrl = new Proxy({}, {
+  get(_, node) {
+    if (!state[node]) { return state[node] ?? undefined; }
+
+    return new Proxy(state[node], {
+      set(obj, key, val) {
+        if (!Object.hasOwn(obj, key) || obj[key] === val) { return true; }
+        const rule = activeRules[node][key];
+        if (!rule) { return true; }
+        if (!valid(rule, true)) { return true; }
+        const enc = rule[4](val);
+        if (enc === null) { return true; }
+
+        if (isMini2S) {
+          send(rule[3], enc).catch(() => {});
+        } else {
+          sendOld(rule[3], enc).catch(() => {});
+        }
+        return true;
+      }
+    });
+  }
+});
+
+function pick(node) {
+  if (!state?.[node]) { return undefined; }
+  const rules = activeRules[node];
+  const entries = Object.entries(state[node]).filter(([key]) => rules[key] && valid(rules[key], true));
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+}
+
+function sync() {
+  const cfg = { tx: pick('tx') };
+  for (const el of cfgInputs) {
+    const [node, key] = el.name.split('.');
+    const val = cfg[node]?.[key];
+    if (val === undefined || val === null) {
+      el.disabled = true;
+      continue;
+    }
+    el.disabled = false;
+    if (el.type === 'checkbox') {
+      el.checked = val;
+      continue;
+    }
+    if (el.type !== 'range') { continue; }
+    el.value = val;
+    const out = el.nextElementSibling;
+    if (!out) { continue; }
+    out.value = numFmt.format(val);
+  }
+}
+
+function apply() {
+  if (!state?.tx.deviceName) { return; }
+
+  if (isMini2S && cfgQueue.length > 0) {
+    sendTime().catch(() => {});
+  }
+
+  while (cfgQueue.length > 0) {
+    const cfg = cfgQueue.shift();
+    if (!isObj(cfg)) { continue; }
+
+    if (ctrl.tx && isObj(cfg.tx)) {
+      Object.assign(ctrl.tx, cfg.tx);
+    }
+  }
+}
+
+async function* stream() {
+  let buf = new Uint8Array();
+  while (true) {
+    if (rxQueue.length === 0) {
+      await new Promise((resolve, reject) => {
+        rxResolve = resolve;
+        rxReject = reject;
+      });
+    }
+
+    const chunk = rxQueue.shift();
+    if (chunk instanceof Error) {
+      throw chunk;
+    }
+    if (!chunk) { continue; }
+
+    buf = concat(buf, chunk);
+    let off = 0;
+    const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
+
+    while (off < buf.length) {
+      const idx = buf.indexOf(0x55, off);
+      if (idx < 0) {
+        off = buf.length;
+        break;
+      }
+      off = idx;
+
+      if (buf.length - off < 4) { break; }
+      if (crc8(buf.subarray(off, off + 3)) !== buf[off + 3]) {
+        off += 1;
+        continue;
+      }
+
+      const sz = view.getUint16(off + 1, true) & 0x3ff;
+      if (sz < 13) {
+        off += 1;
+        continue;
+      }
+      if (sz > buf.length - off) { break; }
+
+      const pkt = buf.subarray(off, off + sz);
+      if (crc16(pkt.subarray(0, sz - 2)) !== view.getUint16(off + sz - 2, true)) {
+        off += 1;
+        continue;
+      }
+      off += sz;
+
+      yield pkt;
+    }
+
+    buf = buf.slice(off);
+  }
+}
+
+const prune = (_, val) => val === null ? undefined : val;
+
+async function main() {
+  try {
+    btDev = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'DJI Mic' }],
+      optionalServices: [0xfff0]
+    });
+
+    btDev.addEventListener('gattserverdisconnected', onDisconnect);
+
+    const server = await btDev.gatt.connect();
+    const service = await server.getPrimaryService(0xfff0);
+    btCharWrite = await service.getCharacteristic(0xfff4);
+    btCharNotify = await service.getCharacteristic(0xfff4);
+
+    await btCharNotify.startNotifications();
+    btCharNotify.addEventListener('characteristicvaluechanged', onCharChanged);
+
+    const parts = btDev.name.split('-');
+    const devName = parts.slice(0, -1).join('-');
+    const suffix = parts.at(-1) || '';
+    isMini2S = devName.includes("Mini 2S");
+    activeRules = isMini2S ? RULES_MINI_2S : RULES;
+
+    state = { tx: { deviceName: devName, addressSuffix: suffix, ...init('tx') } };
+    seq = 0;
+    cfgQueue.length = 0;
+    txQueue.length = 0;
+    txWorker = null;
+
+    let last = '';
+    let lastCfg = '';
+
+    for await (const pkt of stream()) {
+      if (debug) {
+        console.log(`${dump(pkt)}\n`);
+      }
+
+      parse(pkt);
+
+      const currCfg = JSON.stringify(
+        { tx: pick('tx') },
+        prune,
+        2,
+      );
+      if (currCfg !== lastCfg) {
+        sync();
+        applyBtn.disabled = !state.tx.deviceName;
+        cfgTxt.disabled = !state.tx.deviceName;
+        cfgTxt.value = currCfg;
+        lastCfg = currCfg;
+      }
+
+      const curr = JSON.stringify(state, prune, 2);
+      if (curr !== last) {
+        stateTxt.textContent = curr;
+        last = curr;
+      }
+    }
+  } finally {
+    state = null;
+    seq = 0;
+
+    if (btDev) {
+      btDev.removeEventListener('gattserverdisconnected', onDisconnect);
+    }
+    if (btCharNotify) {
+      btCharNotify.removeEventListener('characteristicvaluechanged', onCharChanged);
+    }
+
+    cfgQueue.length = 0;
+    rxQueue.length = 0;
+    rxResolve = null;
+    rxReject = null;
+
+    txQueue.length = 0;
+    if (txWorker) {
+      try { await txWorker; } catch {}
+    }
+    txWorker = null;
+
+    if (btDev?.gatt?.connected) {
+      try { btDev.gatt.disconnect(); } catch {}
+    }
+    btDev = null;
+    btCharWrite = null;
+    btCharNotify = null;
+  }
+}
+
+connBtn.addEventListener('click', async () => {
+  connBtn.disabled = true;
+  try {
+    await main();
+  } catch (e) {
+    stateTxt.textContent = JSON.stringify({ e: e instanceof Error ? `${e.name}: ${e.message}` : String(e) }, null, 2);
+  } finally {
+    sync();
+    applyBtn.disabled = true;
+    cfgTxt.disabled = true;
+    cfgTxt.value = '';
+    connBtn.disabled = false;
+  }
+});
+
+debugChk.addEventListener('change', (e) => { debug = e.target.checked; });
+
+cfgGrp.addEventListener('input', (e) => {
+  if (e.target.type !== 'range') { return; }
+
+  const out = e.target.nextElementSibling;
+
+  if (!out) { return; }
+
+  out.value = numFmt.format(e.target.valueAsNumber);
+});
+
+cfgGrp.addEventListener('change', (e) => {
+  const { name, type, checked, valueAsNumber } = e.target;
+  if (!state?.tx.deviceName || !name) { return; }
+
+  const [node, key] = name.split('.');
+
+  if (!node || !key || !activeRules[node]?.[key]) { return; }
+
+  const val = type === 'checkbox' ? checked : type === 'range' ? valueAsNumber : null;
+  if (val === null) { return; }
+
+  cfgQueue.push({ [node]: { [key]: val } });
+  apply();
+});
+
+applyBtn.addEventListener('click', async () => {
+  applyBtn.disabled = true;
+  cfgTxt.disabled = true;
+
+  try {
+    const cfg = JSON.parse(cfgTxt.value);
+    if (isObj(cfg)) {
+      cfgQueue.push(cfg);
+    }
+  } catch {}
+
+  apply();
+
+  if (txWorker) {
+    try { await txWorker; } catch {}
+  }
+  applyBtn.disabled = !state?.tx.deviceName;
+  cfgTxt.disabled = !state?.tx.deviceName;
+});
+
+sync();
+applyBtn.disabled = true;
+cfgTxt.disabled = true;
+</script>
+</body>
+</html>
