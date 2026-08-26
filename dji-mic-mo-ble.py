@@ -132,6 +132,7 @@ RULES = {
     "tx": {
         "serialNumber":               (0x01, 12, vstr),
         "firmwareVersion":            (0x01,  7, ver(False)),
+        "batteryLevel":               (0x01,  4, bits(2, 0x07)),
         "charging":                   (0x01,  4, bit(0x02)),
         "noiseCancellationViaButton": (0x01,  3, bit(0x80), 0x0f, bl1),
         "autoOff":                    (0x01,  3, bit(0x10), 0x10, bl1),
@@ -144,6 +145,7 @@ RULES_MINI_2S = {
     "tx": {
         "serialNumber":               (0x01, 13, fstr(14)),
         "firmwareVersion":            (0x01,  9, ver(True)),
+        "batteryLevel":               (0x02, 10, bits(2, 0x07)),
         "charging":                   (0x02, 10, bit(0x02)),
         "recordingTimeTotal":         (0x02, 17, f16),
         "recordingTimeRemaining":     (0x02, 19, f16,       0x07, bl1),
